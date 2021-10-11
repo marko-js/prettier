@@ -30,6 +30,7 @@ import asLiteralTextContent from "./utils/as-literal-text-content";
 
 const defaultFilePath = resolve("index.marko");
 const { builders: b } = doc;
+const identity = <T extends unknown>(val: T) => val;
 
 export const languages: SupportLanguage[] = [
   {
@@ -587,46 +588,37 @@ export const printers: Record<string, Printer<Node>> = {
         case "_MarkoEmbed":
           switch (node.mode) {
             case "var": {
-              const doc = (toDoc as any)(
+              return tryPrintEmbed(
                 `var ${node.code}=_`,
-                { parser: opts.markoScriptParser },
-                { stripTrailingHardline: true }
+                opts.markoScriptParser,
+                (doc: any) => doc[0].contents[1].contents[0]
               );
-
-              return doc[0].contents[1].contents[0];
             }
             case "params": {
-              const doc = (toDoc as any)(
+              return tryPrintEmbed(
                 `(${node.code})=>_`,
-                { parser: "__js_expression" },
-                { stripTrailingHardline: true }
+                "__js_expression",
+                (doc: any) => {
+                  const { contents } = doc.contents[0];
+                  if (Array.isArray(contents) && contents[0] === "(") {
+                    return contents.slice(1, -1);
+                  }
+
+                  return contents;
+                }
               );
-
-              const { contents } = doc.contents[0];
-              if (Array.isArray(contents) && contents[0] === "(") {
-                return contents.slice(1, -1);
-              }
-
-              return contents;
             }
             case "script":
-              return (toDoc as any)(
-                node.code,
-                { parser: opts.markoScriptParser },
-                { stripTrailingHardline: true }
-              );
+              return tryPrintEmbed(node.code, opts.markoScriptParser);
             default: {
               if (!node.mode.startsWith("style.")) {
-                throw new Error(`Invalid Marko Embed mode: ${node.mode}`);
+                return [b.trim, asLiteralTextContent(node.code)];
               }
 
-              return (toDoc as any)(
-                node.code,
-                { parser: node.mode.slice("style.".length) },
-                { stripTrailingHardline: true }
-              );
+              return tryPrintEmbed(node.code, node.mode.slice("style.".length));
             }
           }
+
         case "MarkoClass":
           return (toDoc as any)(
             `class ${getOriginalCode(opts, node.body)}`,
@@ -643,21 +635,26 @@ export const printers: Record<string, Printer<Node>> = {
       }
 
       if (t.isStatement(node)) {
-        return withLineIfNeeded(
-          node,
-          opts,
-          (toDoc as any)(
-            getOriginalCode(opts, node),
-            { parser: opts.markoScriptParser },
-            { stripTrailingHardline: true }
-          )
+        return tryPrintEmbed(
+          getOriginalCode(opts, node),
+          opts.markoScriptParser
         );
       } else {
-        return (toDoc as any)(
-          getOriginalCode(opts, node),
-          { parser: "__js_expression" },
-          { stripTrailingHardline: true }
-        );
+        return tryPrintEmbed(getOriginalCode(opts, node), "__js_expression");
+      }
+
+      function tryPrintEmbed(
+        code: string,
+        parser: string,
+        normalize: (doc: Doc) => Doc = identity
+      ) {
+        try {
+          return normalize(
+            (toDoc as any)(code, { parser }, { stripTrailingHardline: true })
+          );
+        } catch {
+          return [b.trim, asLiteralTextContent(code)];
+        }
       }
     },
   },
