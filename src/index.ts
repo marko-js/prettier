@@ -115,6 +115,18 @@ export const parsers: Record<string, Parser<Node>> = {
         output: "source",
         sourceMaps: false,
         writeVersionComment: false,
+        babelConfig: {
+          caller: { name: "@marko/prettier" },
+          babelrc: false,
+          configFile: false,
+          parserOpts: {
+            allowUndeclaredExports: true,
+            allowAwaitOutsideFunction: true,
+            allowReturnOutsideFunction: true,
+            allowImportExportEverywhere: true,
+            plugins: ["exportDefaultFrom", "importAssertions"],
+          },
+        },
       });
 
       opts.originalText = text;
@@ -322,6 +334,7 @@ export const printers: Record<string, Printer<Node>> = {
                 t.isMarkoAttribute(childNode) &&
                 (childNode.name === "class" || childNode.name === "id") &&
                 t.isStringLiteral(childNode.value) &&
+                !childNode.modifier &&
                 shorthandIdOrClassReg.test(childNode.value.value)
               ) {
                 const symbol = childNode.name === "class" ? "." : "#";
