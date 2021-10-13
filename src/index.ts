@@ -600,8 +600,11 @@ export const printers: Record<string, Printer<Node>> = {
                 "__js_expression",
                 (doc: any) => {
                   const { contents } = doc.contents[0];
-                  if (Array.isArray(contents) && contents[0] === "(") {
-                    return contents.slice(1, -1);
+                  if (Array.isArray(contents) && contents[0].startsWith("(")) {
+                    contents[0] = contents[0].slice(1);
+                    contents[contents.length - 1] = contents[
+                      contents.length - 1
+                    ].slice(0, -1);
                   }
 
                   return contents;
