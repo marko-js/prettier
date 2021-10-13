@@ -5,20 +5,30 @@ export default function isTextLike(
   node: Node,
   parent: t.MarkoTag | t.Program
 ): boolean {
-  switch (node.type) {
-    case "MarkoText":
-    case "MarkoPlaceholder":
-      return true;
-    case "MarkoComment": {
-      const body = parent.type === "Program" ? parent.body : parent.body.body;
-      const i = body.indexOf(node);
-      return (
-        i > 0 &&
-        i < body.length - 1 &&
-        (isTextLike(body[i - 1], parent) || isTextLike(body[i + 1], parent))
-      );
+  if (isText(node)) {
+    return true;
+  } else if (node.type === "MarkoComment") {
+    const body = parent.type === "Program" ? parent.body : parent.body.body;
+    const i = body.indexOf(node);
+
+    let j = i;
+    while (j > 0) {
+      const check = body[--j];
+      if (isText(check)) return true;
+      else if (check.type !== "MarkoComment") break;
     }
-    default:
-      return false;
+
+    j = i;
+    while (j < body.length - 1) {
+      const check = body[++j];
+      if (isText(check)) return true;
+      else if (check.type !== "MarkoComment") break;
+    }
   }
+
+  return false;
+}
+
+function isText(node: Node) {
+  return node.type === "MarkoText" || node.type === "MarkoPlaceholder";
 }

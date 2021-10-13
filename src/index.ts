@@ -381,9 +381,8 @@ export const printers: Record<string, Printer<Node>> = {
                 const isText = isTextLike(childNode, node);
 
                 if (isText) {
-                  const isMarkoText = childNode.type === "MarkoText";
                   textDocs.push(
-                    embedMode && isMarkoText
+                    embedMode && childNode.type === "MarkoText"
                       ? callEmbed(print, child, embedMode, childNode.value)
                       : print(child)
                   );
