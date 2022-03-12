@@ -233,7 +233,7 @@ export const printers: Record<string, Printer<Node>> = {
           const doc: Doc[] = [opts.markoSyntax === "html" ? "<" : ""];
           const { markoPreservingSpace } = opts;
           const literalTagName = t.isStringLiteral(node.name)
-            ? node.name.value.toLowerCase()
+            ? node.name.value
             : "";
           const preserveSpace =
             markoPreservingSpace ||
