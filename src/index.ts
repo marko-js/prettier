@@ -343,6 +343,30 @@ export const printers: Record<string, Printer<Node>> = {
                   symbol,
                   childNode.value.value.split(/ +/).join(symbol)
                 );
+              } else if (
+                t.isMarkoAttribute(childNode) &&
+                (childNode.name === "class" || childNode.name === "id") &&
+                childNode.value.type === "ArrayExpression" &&
+                !childNode.modifier &&
+                shortHandIdOrClassInArray(childNode)
+              ) {
+                for(let i=childNode.value.elements.length-1;i>=0;i--){
+                  const el = childNode.value.elements[i];
+                  if(t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)){
+                    const symbol = childNode.name === "class" ? "." : "#";
+                    const thisEl = childNode.value.elements.splice(i,1)[0];
+                    doc.push(
+                      symbol,
+                      thisEl.value.split(/ +/).join(symbol)
+                    );
+                  }
+                }
+                if(childNode.value.elements.length==1) childNode.value = childNode.value.elements[0]
+                if ((childNode as t.MarkoAttribute).default) {
+                  doc.push(print(childPath));
+                } else {
+                  attrsDoc.push(print(childPath));
+                }
               } else if ((childNode as t.MarkoAttribute).default) {
                 doc.push(print(childPath));
               } else {
@@ -661,3 +685,12 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
+function shortHandIdOrClassInArray(childNode){
+  for(let i=childNode.value.elements.length-1;i>=0;i--){
+    const el = childNode.value.elements[i];
+    if(t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)){
+      return true;
+    }
+  }
+  return false;
+}
