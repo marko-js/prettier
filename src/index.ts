@@ -350,18 +350,19 @@ export const printers: Record<string, Printer<Node>> = {
                 !childNode.modifier &&
                 shortHandIdOrClassInArray(childNode)
               ) {
-                for(let i=childNode.value.elements.length-1;i>=0;i--){
+                for (let i = childNode.value.elements.length - 1; i >= 0; i--) {
                   const el = childNode.value.elements[i];
-                  if(t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)){
+                  if (
+                    t.isStringLiteral(el) &&
+                    shorthandIdOrClassReg.test(el.value)
+                  ) {
                     const symbol = childNode.name === "class" ? "." : "#";
-                    const thisEl = childNode.value.elements.splice(i,1)[0];
-                    doc.push(
-                      symbol,
-                      thisEl.value.split(/ +/).join(symbol)
-                    );
+                    const thisEl = childNode.value.elements.splice(i, 1)[0];
+                    doc.push(symbol, thisEl.value.split(/ +/).join(symbol));
                   }
                 }
-                if(childNode.value.elements.length==1) childNode.value = childNode.value.elements[0]
+                if (childNode.value.elements.length == 1)
+                  childNode.value = childNode.value.elements[0];
                 if ((childNode as t.MarkoAttribute).default) {
                   doc.push(print(childPath));
                 } else {
@@ -685,10 +686,10 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
-function shortHandIdOrClassInArray(childNode){
-  for(let i=childNode.value.elements.length-1;i>=0;i--){
+function shortHandIdOrClassInArray(childNode) {
+  for (let i = childNode.value.elements.length - 1; i >= 0; i--) {
     const el = childNode.value.elements[i];
-    if(t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)){
+    if (t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)) {
       return true;
     }
   }
