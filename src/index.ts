@@ -357,11 +357,11 @@ export const printers: Record<string, Printer<Node>> = {
                     shorthandIdOrClassReg.test(el.value)
                   ) {
                     const symbol = childNode.name === "class" ? "." : "#";
-                    const thisEl = childNode.value.elements.splice(i, 1)[0];
-                    doc.push(symbol, thisEl.value.split(/ +/).join(symbol));
+                    childNode.value.elements.splice(i, 1);
+                    doc.push(symbol, el.value.split(/ +/).join(symbol));
                   }
                 }
-                if (childNode.value.elements.length == 1)
+                if (childNode.value.elements.length == 1 && t.isExpression(childNode.value.elements[0]))
                   childNode.value = childNode.value.elements[0];
                 if ((childNode as t.MarkoAttribute).default) {
                   doc.push(print(childPath));
@@ -686,11 +686,13 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
-function shortHandIdOrClassInArray(childNode) {
-  for (let i = childNode.value.elements.length - 1; i >= 0; i--) {
-    const el = childNode.value.elements[i];
-    if (t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)) {
-      return true;
+function shortHandIdOrClassInArray(childNode:t.MarkoAttribute) {
+  if(childNode.value.type === "ArrayExpression"){
+    for (let i = childNode.value.elements.length - 1; i >= 0; i--) {
+      const el = childNode.value.elements[i];
+      if (t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)) {
+        return true;
+      }
     }
   }
   return false;
