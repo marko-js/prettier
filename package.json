@@ -27,7 +27,7 @@
     "lint-staged": "^11.2.3",
     "marko": "^5.15.10",
     "mocha": "^9.1.2",
-    "mocha-snap": "^4.0.2",
+    "mocha-snap": "^4.3.0",
     "nyc": "^15.1.0",
     "prettier": "^2.3.2",
     "semantic-release": "^18.0.0",
