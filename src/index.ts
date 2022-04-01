@@ -361,7 +361,10 @@ export const printers: Record<string, Printer<Node>> = {
                     doc.push(symbol, el.value.split(/ +/).join(symbol));
                   }
                 }
-                if (childNode.value.elements.length == 1 && t.isExpression(childNode.value.elements[0]))
+                if (
+                  childNode.value.elements.length == 1 &&
+                  t.isExpression(childNode.value.elements[0])
+                )
                   childNode.value = childNode.value.elements[0];
                 if ((childNode as t.MarkoAttribute).default) {
                   doc.push(print(childPath));
@@ -686,8 +689,8 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
-function shortHandIdOrClassInArray(childNode:t.MarkoAttribute) {
-  if(childNode.value.type === "ArrayExpression"){
+function shortHandIdOrClassInArray(childNode: t.MarkoAttribute) {
+  if (childNode.value.type === "ArrayExpression") {
     for (let i = childNode.value.elements.length - 1; i >= 0; i--) {
       const el = childNode.value.elements[i];
       if (t.isStringLiteral(el) && shorthandIdOrClassReg.test(el.value)) {
