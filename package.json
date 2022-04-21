@@ -33,6 +33,12 @@
     "semantic-release": "^18.0.0",
     "typescript": "^4.4.3"
   },
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist",
     "!**/__tests__",
