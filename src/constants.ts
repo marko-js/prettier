@@ -29,7 +29,7 @@ export type Node = t.Node | MarkoEmbedNode;
 
 export const enclosedNodeTypeReg =
   /^(?:Identifier|.*Literal|(?:Object|Array|Parenthesized|Record|Tuple)Expression)$/;
-export const styleReg = /^style(?:\.([^\s]+))?\s*\{?/;
+export const styleReg = /^style((?:\.[^\s\\/:*?"<>|({]+)+)?\s*\{?/;
 export const voidHTMLReg =
   /^(?:area|b(?:ase|r)|col|embed|hr|i(?:mg|nput)|keygen|link|meta|param|source|track|wbr)$/;
 export const shorthandIdOrClassReg =
