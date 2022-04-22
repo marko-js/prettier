@@ -30,7 +30,7 @@ import asLiteralTextContent from "./utils/as-literal-text-content";
 
 const defaultFilePath = resolve("index.marko");
 const { builders: b } = doc;
-const identity = <T extends unknown>(val: T) => val;
+const identity = <T>(val: T) => val;
 
 export const languages: SupportLanguage[] = [
   {
@@ -43,7 +43,7 @@ export const languages: SupportLanguage[] = [
     vscodeLanguageIds: ["marko"],
     linguistLanguageId: 932782397,
     codemirrorMimeType: "text/html",
-    extensions: [".marko", ".ts.marko"],
+    extensions: [".marko"],
   },
 ];
 
@@ -245,12 +245,12 @@ export const printers: Record<string, Printer<Node>> = {
             if (literalTagName === "script") {
               embedMode = "script";
             } else if (literalTagName === "style") {
-              const [startContent, lang = "css"] = styleReg.exec(
+              const [startContent, lang = ".css"] = styleReg.exec(
                 node.rawValue || literalTagName
               )!;
 
               embedMode = `style.${
-                getFileInfo.sync(`${opts.filepath}.${lang}`).inferredParser
+                getFileInfo.sync(opts.filepath + lang).inferredParser
               }`;
 
               if (startContent.endsWith("{")) {
@@ -264,7 +264,7 @@ export const printers: Record<string, Printer<Node>> = {
 
                 return b.group([
                   "style",
-                  lang === "css" ? "" : `.${lang}`,
+                  lang === ".css" ? "" : lang,
                   " {",
                   b.indent([b.line, callEmbed(print, path, embedMode, code)]),
                   b.line,
@@ -283,6 +283,8 @@ export const printers: Record<string, Printer<Node>> = {
               ])
             );
           }
+
+          const shorthandIndex = doc.push("") - 1;
 
           if (node.var) {
             doc.push(
@@ -339,10 +341,8 @@ export const printers: Record<string, Printer<Node>> = {
                 shorthandIdOrClassReg.test(childNode.value.value)
               ) {
                 const symbol = childNode.name === "class" ? "." : "#";
-                doc.push(
-                  symbol,
-                  childNode.value.value.split(/ +/).join(symbol)
-                );
+                doc[shorthandIndex] +=
+                  symbol + childNode.value.value.split(/ +/).join(symbol);
               } else if ((childNode as t.MarkoAttribute).default) {
                 doc.push(print(childPath));
               } else {
