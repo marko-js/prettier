@@ -77,12 +77,13 @@ enclosedPatterns.push(
 const unenclosedPatterns: Pattern[] = [
   {
     // Word operators
-    match: /(?<=\b)\s*(?:as|in(?:stanceof)?|new|void|delete|keyof|typeof)\s+/y,
+    match:
+      /(?<=\b)[ \t]*(?:as|in(?:stanceof)?|new|void|delete|keyof|typeof)[ \t]+/y,
   },
   {
     // Symbol operators
     match:
-      /\s*(?:[\^~%!]|\+{1,2}|\*{1,2}|-(?:-(?!\s))?|&{1,2}|\|{1,2}|!={0,2}|===?|<{2,3}|>{2,3}|<=?|>=)\s*/y,
+      /[ \t]*(?:[\^~%!]|\+{1,2}|\*{1,2}|-(?:-(?!\s))?|&{1,2}|\|{1,2}|!={0,2}|===?|<{2,3}|>{2,3}|<=?|>=)[ \t]*/y,
   },
 ].concat(enclosedPatterns);
 
