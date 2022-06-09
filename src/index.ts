@@ -514,7 +514,7 @@ export const printers: Record<string, Printer<Node>> = {
                   b.indent([
                     b.line,
                     b.join(
-                      b.hardlineWithoutBreakParent,
+                      b.hardline,
                       path.map(print, "value", "body", "body")
                     ),
                   ]),
