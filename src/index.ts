@@ -514,7 +514,7 @@ export const printers: Record<string, Printer<Node>> = {
                   b.indent([
                     b.line,
                     b.join(
-                      b.hardlineWithoutBreakParent,
+                      b.hardline,
                       path.map(print, "value", "body", "body")
                     ),
                   ]),
@@ -590,7 +590,23 @@ export const printers: Record<string, Printer<Node>> = {
               return tryPrintEmbed(
                 `var ${node.code}=_`,
                 opts.markoScriptParser,
-                (doc: any) => doc[0].contents[1].contents[0]
+                (doc: any) => {
+                  const contents = doc[0].contents[1].contents;
+                  for (let i = contents.length; i--; ) {
+                    const item = contents[i];
+                    if (typeof item === "string") {
+                      // Walks back until we find the equals sign.
+                      const match = /\s*=\s*$/.exec(item);
+                      if (match) {
+                        contents[i] = item.slice(0, -match[0].length);
+                        contents.length = i + 1;
+                        break;
+                      }
+                    }
+                  }
+
+                  return contents;
+                }
               );
             }
             case "params": {
