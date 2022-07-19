@@ -9,18 +9,23 @@ export default function withParensIfNeeded(
   opts: ParserOptions,
   valDoc: Doc
 ) {
+  if (enclosedNodeTypeReg.test(node.type)) return valDoc;
+  const { formatted } = doc.printer.printDocToString(valDoc, {
+    ...opts,
+    printWidth: 0,
+  });
   if (
-    !enclosedNodeTypeReg.test(node.type) &&
-    outerCodeMatches(
-      doc.printer.printDocToString(valDoc, {
-        ...opts,
-        printWidth: 0,
-      }).formatted,
-      /\s|>/y,
-      opts.markoAttrParen
-    )
+    opts.markoAttrParen
+      ? outerCodeMatches(formatted, /\s|>/y, true)
+      : outerCodeMatches(formatted, />/y, false)
   ) {
     return ["(", b.indent([b.softline, valDoc]), b.softline, ")"];
+  } else if (outerCodeMatches(formatted, /\n/y, false)) {
+    return [
+      b.ifBreak("("),
+      b.indent([b.softline, valDoc]),
+      b.ifBreak([b.softline, ")"]),
+    ];
   }
 
   return valDoc;
