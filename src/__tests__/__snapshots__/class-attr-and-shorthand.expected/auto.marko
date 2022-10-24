@@ -1,0 +1,26 @@
+<div.string.blue/>
+<div.blue.string_list/>
+
+<div.templatestring class=`${blue}`/>
+<div.templatestring_list class=`${blue}`/>
+
+<div.dynamic class=blue/>
+<div.dynamic_list class=blue/>
+
+<div.red.green.mixed_list class=[blue, yellow]/>
+<div.long_list class=[
+  red,
+  yellow,
+  (() => "blue")(),
+  orange,
+...colorList.map((item) => item.color),
+  green
+]/>
+<div.long_item class=(
+  ["red", "orange", "yellow", "green", "blue", "indigo", "violet"]
+    .filter((color) => color.indexOf("e") >= 0)
+    .map((color) => color.toUpperCase())
+)/>
+
+<div.red.multiple.blue/>
+<div.multiple.red.blue/>

@@ -8,6 +8,7 @@ import {
   Printer,
   getFileInfo,
   SupportOptions,
+  AstPath,
 } from "prettier";
 import { compileSync, types as t } from "@marko/compiler";
 import {
@@ -333,16 +334,55 @@ export const printers: Record<string, Printer<Node>> = {
             path.each((childPath) => {
               const childNode = childPath.getValue();
 
-              if (
+              if (t.isMarkoAttribute(childNode) && childNode.name === "class") {
+                const printOrClassShorthand = (itemPath: AstPath<Node>) => {
+                  const itemNode = itemPath.getNode();
+                  if (
+                    t.isStringLiteral(itemNode) &&
+                    shorthandIdOrClassReg.test(itemNode.value)
+                  ) {
+                    doc[shorthandIndex] +=
+                      "." + itemNode.value.split(/ +/).join(".");
+                    return "";
+                  }
+                  return print(itemPath);
+                };
+
+                const classList = t.isArrayExpression(childNode.value)
+                  ? childPath.map(printOrClassShorthand, "value", "elements")
+                  : [childPath.call(printOrClassShorthand, "value")];
+
+                const dynamicClasses = classList.filter((item) => item !== "");
+
+                if (dynamicClasses.length === 1) {
+                  attrsDoc.push(
+                    b.group([
+                      "class=",
+                      b.ifBreak(["(", b.indent(b.line)]),
+                      b.indent(dynamicClasses[0]),
+                      b.ifBreak([b.line, ")"]),
+                    ])
+                  );
+                } else if (dynamicClasses.length) {
+                  attrsDoc.push(
+                    b.group([
+                      "class=[",
+                      b.indent([
+                        b.softline,
+                        b.join([",", b.line], dynamicClasses),
+                      ]),
+                      b.softline,
+                      "]",
+                    ])
+                  );
+                }
+              } else if (
                 t.isMarkoAttribute(childNode) &&
-                (childNode.name === "class" || childNode.name === "id") &&
+                childNode.name === "id" &&
                 t.isStringLiteral(childNode.value) &&
-                !childNode.modifier &&
                 shorthandIdOrClassReg.test(childNode.value.value)
               ) {
-                const symbol = childNode.name === "class" ? "." : "#";
-                doc[shorthandIndex] +=
-                  symbol + childNode.value.value.split(/ +/).join(symbol);
+                doc[shorthandIndex] += "#" + childNode.value.value;
               } else if ((childNode as t.MarkoAttribute).default) {
                 doc.push(print(childPath));
               } else {

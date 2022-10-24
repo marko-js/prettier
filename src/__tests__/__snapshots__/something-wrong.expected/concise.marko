@@ -9,13 +9,12 @@ class {
 $ var count = state.count;
 
 div.click-count
-  div class=[
-    "count",
+  div.count class=(
     {
       positive: count > 0,
       negative: count < 0,
-    },
-  ]
+    }
+  )
     -- ${count}
   button on-click("increment", -1) -- -1
   button on-click("increment", 1) -- +1
