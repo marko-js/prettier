@@ -224,8 +224,20 @@ export const printers: Record<string, Printer<Node>> = {
           return `<!${node.value.replace(/\s+/g, " ").trim()}>`;
         case "MarkoDeclaration":
           return asLiteralTextContent(`<?${node.value}?>`);
-        case "MarkoComment":
-          return asLiteralTextContent(`<!--${node.value}-->`);
+        case "MarkoComment": {
+          const start = node.loc?.start;
+          switch (
+            start != null &&
+            opts.originalText[locToPos(start, opts) + 1]
+          ) {
+            case "/":
+              return [asLiteralTextContent(`//${node.value}`), b.hardline];
+            case "*":
+              return asLiteralTextContent(`/*${node.value}*/`);
+            default:
+              return asLiteralTextContent(`<!--${node.value}-->`);
+          }
+        }
         case "MarkoCDATA":
           return asLiteralTextContent(`<![CDATA[${node.value}]]>`);
         case "MarkoTag": {
