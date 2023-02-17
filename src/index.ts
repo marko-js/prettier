@@ -8,6 +8,7 @@ import {
   Printer,
   getFileInfo,
   SupportOptions,
+  AstPath,
 } from "prettier";
 import { compileSync, types as t } from "@marko/compiler";
 import {
@@ -241,6 +242,7 @@ export const printers: Record<string, Printer<Node>> = {
         case "MarkoCDATA":
           return asLiteralTextContent(`<![CDATA[${node.value}]]>`);
         case "MarkoTag": {
+          const tagPath = path as AstPath<t.MarkoTag>;
           const groupId = Symbol();
           const doc: Doc[] = [opts.markoSyntax === "html" ? "<" : ""];
           const { markoPreservingSpace } = opts;
@@ -278,7 +280,10 @@ export const printers: Record<string, Printer<Node>> = {
                   "style",
                   lang === ".css" ? "" : lang,
                   " {",
-                  b.indent([b.line, callEmbed(print, path, embedMode, code)]),
+                  b.indent([
+                    b.line,
+                    callEmbed(print, tagPath, embedMode, code),
+                  ]),
                   b.line,
                   "}",
                 ]);
@@ -289,7 +294,7 @@ export const printers: Record<string, Printer<Node>> = {
             doc.push(
               b.group([
                 "${",
-                b.indent([b.softline, path.call(print, "name")]),
+                b.indent([b.softline, tagPath.call(print, "name")]),
                 b.softline,
                 "}",
               ])
@@ -301,7 +306,7 @@ export const printers: Record<string, Printer<Node>> = {
           if (node.var) {
             doc.push(
               "/",
-              callEmbed(print, path, "var", getOriginalCode(opts, node.var))
+              callEmbed(print, tagPath, "var", getOriginalCode(opts, node.var))
             );
           }
 
@@ -311,7 +316,7 @@ export const printers: Record<string, Printer<Node>> = {
                 "(",
                 b.indent([
                   b.softline,
-                  b.join([",", b.line], path.map(print, "arguments")),
+                  b.join([",", b.line], tagPath.map(print, "arguments")),
                   opts.trailingComma ? b.ifBreak(",") : "",
                 ]),
                 b.softline,
@@ -326,7 +331,7 @@ export const printers: Record<string, Printer<Node>> = {
                 "|",
                 callEmbed(
                   print,
-                  path,
+                  tagPath,
                   "params",
                   getOriginalCode(
                     opts,
@@ -342,7 +347,7 @@ export const printers: Record<string, Printer<Node>> = {
           if (node.attributes.length) {
             const attrsDoc: Doc[] = [];
 
-            path.each((childPath) => {
+            tagPath.each((childPath) => {
               const childNode = childPath.getValue();
 
               if (
@@ -387,7 +392,7 @@ export const printers: Record<string, Printer<Node>> = {
             let textDocs = [] as Doc[];
             let textOnly = true;
 
-            path.each(
+            tagPath.each(
               (child, i) => {
                 const childNode = child.getValue();
                 const isText = isTextLike(childNode, node);
@@ -473,6 +478,7 @@ export const printers: Record<string, Printer<Node>> = {
           return withLineIfNeeded(node, opts, b.group(doc, { id: groupId }));
         }
         case "MarkoAttribute": {
+          const attrPath = path as AstPath<t.MarkoAttribute>;
           const doc: Doc[] = [];
           const { value } = node;
 
@@ -489,7 +495,7 @@ export const printers: Record<string, Printer<Node>> = {
                   "(",
                   b.indent([
                     b.softline,
-                    b.join([",", b.line], path.map(print, "arguments")),
+                    b.join([",", b.line], attrPath.map(print, "arguments")),
                     opts.trailingComma ? b.ifBreak(",") : "",
                   ]),
                   b.softline,
@@ -510,7 +516,7 @@ export const printers: Record<string, Printer<Node>> = {
                   value.params.length
                     ? callEmbed(
                         print,
-                        path,
+                        attrPath,
                         "params",
                         getOriginalCode(
                           opts,
@@ -527,7 +533,7 @@ export const printers: Record<string, Printer<Node>> = {
                     b.line,
                     b.join(
                       b.hardline,
-                      path.map(print, "value", "body", "body")
+                      (attrPath as any).map(print, "value", "body", "body")
                     ),
                   ]),
                   b.line,
@@ -539,8 +545,12 @@ export const printers: Record<string, Printer<Node>> = {
                 node.bound ? ":=" : "=",
                 b.group(
                   enclosedNodeTypeReg.test(node.type)
-                    ? path.call(print, "value")
-                    : withParensIfNeeded(value, opts, path.call(print, "value"))
+                    ? attrPath.call(print, "value")
+                    : withParensIfNeeded(
+                        value,
+                        opts,
+                        attrPath.call(print, "value")
+                      )
                 )
               );
             }
@@ -550,11 +560,19 @@ export const printers: Record<string, Printer<Node>> = {
         }
         case "MarkoSpreadAttribute": {
           return (["..."] as Doc[]).concat(
-            withParensIfNeeded(node.value, opts, path.call(print, "value"))
+            withParensIfNeeded(
+              node.value,
+              opts,
+              (path as AstPath<t.MarkoSpreadAttribute>).call(print, "value")
+            )
           );
         }
         case "MarkoPlaceholder":
-          return [node.escape ? "${" : "$!{", path.call(print, "value"), "}"];
+          return [
+            node.escape ? "${" : "$!{",
+            (path as AstPath<t.MarkoPlaceholder>).call(print, "value"),
+            "}",
+          ];
         case "MarkoScriptlet":
           return withLineIfNeeded(
             node.body[0],
