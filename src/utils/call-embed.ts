@@ -23,7 +23,7 @@ export default function callEmbed(
   };
 
   try {
-    return path.call(print, "_embed");
+    return (path as any).call(print, "_embed");
   } finally {
     node._embed = undefined;
   }
