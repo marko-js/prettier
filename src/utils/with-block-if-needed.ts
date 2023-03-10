@@ -8,13 +8,14 @@ const { builders: b } = doc;
 export default function withBlockIfNeeded(
   nodes: t.Statement[],
   opts: ParserOptions,
-  docs: Doc[]
+  /* must use a factory function because `printDocToString` has side effects */
+  getDocs: () => Doc[]
 ) {
   if (
     nodes.length > 1 ||
     (!enclosedNodeTypeReg.test(nodes[0].type) &&
       outerCodeMatches(
-        doc.printer.printDocToString(docs, {
+        doc.printer.printDocToString(getDocs(), {
           ...opts,
           printWidth: 0,
         }).formatted,
@@ -22,10 +23,10 @@ export default function withBlockIfNeeded(
       ))
   ) {
     return [
-      b.indent([b.ifBreak(["{", b.line]), b.join(b.hardline, docs)]),
+      b.indent([b.ifBreak(["{", b.line]), b.join(b.hardline, getDocs())]),
       b.ifBreak([b.line, "}"]),
     ];
   }
 
-  return docs;
+  return getDocs();
 }

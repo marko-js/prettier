@@ -546,9 +546,7 @@ export const printers: Record<string, Printer<Node>> = {
                 b.group(
                   enclosedNodeTypeReg.test(node.type)
                     ? attrPath.call(print, "value")
-                    : withParensIfNeeded(
-                        value,
-                        opts,
+                    : withParensIfNeeded(value, opts, () =>
                         attrPath.call(print, "value")
                       )
                 )
@@ -560,9 +558,7 @@ export const printers: Record<string, Printer<Node>> = {
         }
         case "MarkoSpreadAttribute": {
           return (["..."] as Doc[]).concat(
-            withParensIfNeeded(
-              node.value,
-              opts,
+            withParensIfNeeded(node.value, opts, () =>
               (path as AstPath<t.MarkoSpreadAttribute>).call(print, "value")
             )
           );
@@ -579,7 +575,7 @@ export const printers: Record<string, Printer<Node>> = {
             opts,
             b.group([
               node.static ? "static " : "$ ",
-              withBlockIfNeeded(node.body, opts, path.map(print, "body")),
+              withBlockIfNeeded(node.body, opts, () => path.map(print, "body")),
             ])
           );
         case "MarkoText": {

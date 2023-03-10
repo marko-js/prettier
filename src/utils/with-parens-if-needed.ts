@@ -7,12 +7,13 @@ const { builders: b } = doc;
 export default function withParensIfNeeded(
   node: Node,
   opts: ParserOptions,
-  valDoc: Doc
+  /* must use a factory function because `printDocToString` has side effects */
+  getValDoc: () => Doc
 ) {
   if (
     !enclosedNodeTypeReg.test(node.type) &&
     outerCodeMatches(
-      doc.printer.printDocToString(valDoc, {
+      doc.printer.printDocToString(getValDoc(), {
         ...opts,
         printWidth: 0,
       }).formatted,
@@ -20,8 +21,8 @@ export default function withParensIfNeeded(
       opts.markoAttrParen
     )
   ) {
-    return ["(", b.indent([b.softline, valDoc]), b.softline, ")"];
+    return ["(", b.indent([b.softline, getValDoc()]), b.softline, ")"];
   }
 
-  return valDoc;
+  return getValDoc();
 }
