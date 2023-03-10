@@ -579,7 +579,7 @@ export const printers: Record<string, Printer<Node>> = {
             opts,
             b.group([
               node.static ? "static " : "$ ",
-              withBlockIfNeeded(node.body, opts, path.map(print, "body")),
+              withBlockIfNeeded(node.body, path.map(print, "body")),
             ])
           );
         case "MarkoText": {
