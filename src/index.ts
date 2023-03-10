@@ -559,7 +559,7 @@ export const printers: Record<string, Printer<Node>> = {
         case "MarkoSpreadAttribute": {
           return (["..."] as Doc[]).concat(
             withParensIfNeeded(node.value, opts, () =>
-              path.call(print, "value")
+              (path as AstPath<t.MarkoSpreadAttribute>).call(print, "value")
             )
           );
         }
