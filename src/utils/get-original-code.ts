@@ -3,17 +3,13 @@ import { Node } from "../constants";
 import locToPos from "./loc-to-pos";
 import generate from "@babel/generator";
 
-export default function getOriginalCode(
-  opts: ParserOptions<Node>,
-  start: Node,
-  end: Node = start
-) {
-  const startLoc = start.loc;
-  const endLoc = end.loc;
+export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
+  const literal = literalToString(node);
+  if (literal !== undefined) return literal;
 
-  if ((start === end && !startLoc) || !endLoc) {
-    // Work around for manually generated ast like class shorthand.
-    return generate(start as any, {
+  const loc = node.loc;
+  if (!loc) {
+    return generate(node as any, {
       filename: opts.filepath,
       compact: false,
       comments: true,
@@ -22,7 +18,28 @@ export default function getOriginalCode(
   }
 
   return opts.originalText.slice(
-    locToPos(startLoc!.start, opts),
-    locToPos(endLoc!.end, opts)
+    locToPos(loc.start, opts),
+    locToPos(loc.end, opts)
   );
+}
+
+export function getOriginalCodeForList(
+  opts: ParserOptions<Node>,
+  sep: string,
+  list: Node[]
+) {
+  return list.map((node) => getOriginalCodeForNode(opts, node)).join(sep);
+}
+
+function literalToString(node: Node) {
+  switch (node.type) {
+    case "StringLiteral":
+      return `"${node.value.replace(/(["\\])/g, "\\$1")}"`;
+    case "NumericLiteral":
+      return node.value.toString();
+    case "BooleanLiteral":
+      return node.value ? "true" : "false";
+    case "NullLiteral":
+      return "null";
+  }
 }
