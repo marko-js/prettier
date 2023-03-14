@@ -23,11 +23,14 @@ import {
 import locToPos from "./utils/loc-to-pos";
 import callEmbed from "./utils/call-embed";
 import isTextLike from "./utils/is-text-like";
-import getOriginalCode from "./utils/get-original-code";
 import withLineIfNeeded from "./utils/with-line-if-needed";
 import withBlockIfNeeded from "./utils/with-block-if-needed";
 import withParensIfNeeded from "./utils/with-parens-if-needed";
 import asLiteralTextContent from "./utils/as-literal-text-content";
+import {
+  getOriginalCodeForNode,
+  getOriginalCodeForList,
+} from "./utils/get-original-code";
 
 const defaultFilePath = resolve("index.marko");
 const { builders: b } = doc;
@@ -306,7 +309,12 @@ export const printers: Record<string, Printer<Node>> = {
           if (node.var) {
             doc.push(
               "/",
-              callEmbed(print, tagPath, "var", getOriginalCode(opts, node.var))
+              callEmbed(
+                print,
+                tagPath,
+                "var",
+                getOriginalCodeForNode(opts, node.var)
+              )
             );
           }
 
@@ -333,11 +341,7 @@ export const printers: Record<string, Printer<Node>> = {
                   print,
                   tagPath,
                   "params",
-                  getOriginalCode(
-                    opts,
-                    node.body.params[0],
-                    node.body.params[node.body.params.length - 1]
-                  )
+                  getOriginalCodeForList(opts, ",", node.body.params)
                 ),
                 "|",
               ])
@@ -351,6 +355,8 @@ export const printers: Record<string, Printer<Node>> = {
               const childNode = childPath.getValue();
 
               if (
+                (literalTagName === "style" ||
+                  opts.markoSyntax === "concise") &&
                 t.isMarkoAttribute(childNode) &&
                 (childNode.name === "class" || childNode.name === "id") &&
                 t.isStringLiteral(childNode.value) &&
@@ -518,11 +524,7 @@ export const printers: Record<string, Printer<Node>> = {
                         print,
                         attrPath,
                         "params",
-                        getOriginalCode(
-                          opts,
-                          value.params[0],
-                          value.params[value.params.length - 1]
-                        )
+                        getOriginalCodeForList(opts, ",", value.params)
                       )
                     : "",
                   ")",
@@ -665,7 +667,7 @@ export const printers: Record<string, Printer<Node>> = {
 
         case "MarkoClass":
           return (toDoc as any)(
-            `class ${getOriginalCode(opts, node.body)}`,
+            `class ${getOriginalCodeForNode(opts, node.body)}`,
             { parser: "__js_expression" },
             { stripTrailingHardline: true }
           );
@@ -680,11 +682,14 @@ export const printers: Record<string, Printer<Node>> = {
 
       if (t.isStatement(node)) {
         return tryPrintEmbed(
-          getOriginalCode(opts, node),
+          getOriginalCodeForNode(opts, node),
           opts.markoScriptParser
         );
       } else {
-        return tryPrintEmbed(getOriginalCode(opts, node), "__js_expression");
+        return tryPrintEmbed(
+          getOriginalCodeForNode(opts, node),
+          "__js_expression"
+        );
       }
 
       function tryPrintEmbed(
