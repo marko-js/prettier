@@ -33,8 +33,9 @@ import {
 } from "./utils/get-original-code";
 
 const defaultFilePath = resolve("index.marko");
-const { builders: b } = doc;
+const { builders: b, utils } = doc;
 const identity = <T>(val: T) => val;
+const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
 
 export const languages: SupportLanguage[] = [
   {
@@ -395,59 +396,93 @@ export const printers: Record<string, Printer<Node>> = {
           } else if (node.body.body.length) {
             const lastIndex = node.body.body.length - 1;
             const bodyDocs = [] as Doc[];
-            let textDocs = [] as Doc[];
             let textOnly = true;
 
-            tagPath.each(
-              (child, i) => {
-                const childNode = child.getValue();
-                const isText = isTextLike(childNode, node);
+            if (embedMode) {
+              let placeholderId = 0;
+              const placeholders = [] as Doc[];
+              let embeddedCode = "";
 
-                if (isText) {
-                  textDocs.push(
-                    embedMode && childNode.type === "MarkoText"
-                      ? callEmbed(print, child, embedMode, childNode.value)
-                      : print(child)
-                  );
-                  if (i !== lastIndex) return;
-                } else {
-                  textOnly = false;
-                }
+              tagPath.each(
+                (child) => {
+                  const node = child.getValue();
+                  if (node.type === "MarkoText") {
+                    embeddedCode += node.value;
+                  } else {
+                    embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
+                    placeholders.push(print(child));
+                  }
+                },
+                "body",
+                "body"
+              );
 
-                if (textDocs.length) {
-                  const isFirst = !bodyDocs.length;
-                  bodyDocs.push(
-                    b.group([
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : isFirst
-                        ? b.ifBreak("--", " --", { groupId })
-                        : "--",
-                      opts.markoSyntax === "html"
-                        ? preserveSpace || isFirst
+              const embeddedDoc = replaceEmbeddedPlaceholders(
+                callEmbed(print, tagPath, embedMode, embeddedCode),
+                placeholders
+              );
+
+              bodyDocs.push(
+                b.group([
+                  opts.markoSyntax === "html"
+                    ? ""
+                    : b.ifBreak("--", " --", { groupId }),
+                  opts.markoSyntax === "html" ? "" : b.line,
+                  embeddedDoc,
+                  opts.markoSyntax === "html"
+                    ? ""
+                    : b.ifBreak([b.softline, "--"]),
+                ])
+              );
+            } else {
+              let textDocs = [] as Doc[];
+              tagPath.each(
+                (child, i) => {
+                  const childNode = child.getValue();
+                  const isText = isTextLike(childNode, node);
+
+                  if (isText) {
+                    textDocs.push(print(child));
+                    if (i !== lastIndex) return;
+                  } else {
+                    textOnly = false;
+                  }
+
+                  if (textDocs.length) {
+                    const isFirst = !bodyDocs.length;
+                    bodyDocs.push(
+                      b.group([
+                        opts.markoSyntax === "html"
                           ? ""
-                          : b.softline
-                        : preserveSpace
-                        ? b.hardline
-                        : b.line,
-                      preserveSpace ? textDocs : b.fill(textDocs),
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : b.ifBreak([b.softline, "--"]),
-                    ])
-                  );
+                          : isFirst
+                          ? b.ifBreak("--", " --", { groupId })
+                          : "--",
+                        opts.markoSyntax === "html"
+                          ? preserveSpace || isFirst
+                            ? ""
+                            : b.softline
+                          : preserveSpace
+                          ? b.hardline
+                          : b.line,
+                        preserveSpace ? textDocs : b.fill(textDocs),
+                        opts.markoSyntax === "html"
+                          ? ""
+                          : b.ifBreak([b.softline, "--"]),
+                      ])
+                    );
 
-                  if (!isText) {
-                    textDocs = [];
+                    if (!isText) {
+                      textDocs = [];
+                      bodyDocs.push(print(child));
+                    }
+                  } else {
                     bodyDocs.push(print(child));
                   }
-                } else {
-                  bodyDocs.push(print(child));
-                }
-              },
-              "body",
-              "body"
-            );
+                },
+                "body",
+                "body"
+              );
+            }
 
             const sep =
               (preserveSpace || !textOnly) &&
@@ -708,3 +743,41 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
+
+function replaceEmbeddedPlaceholders(doc: Doc, placeholders: Doc[]) {
+  if (!placeholders.length) return doc;
+
+  return utils.mapDoc(doc, (cur) => {
+    if (typeof cur === "string") {
+      let match = embeddedPlaceholderReg.exec(cur);
+
+      if (match) {
+        const replacementDocs = [] as Doc[];
+        let index = 0;
+
+        do {
+          const placeholderIndex = +match[1];
+
+          if (index !== match.index) {
+            replacementDocs.push(cur.slice(index, match.index));
+          }
+
+          replacementDocs.push(placeholders[placeholderIndex]);
+          index = match.index + match[0].length;
+        } while ((match = embeddedPlaceholderReg.exec(cur)));
+
+        if (index !== cur.length) {
+          replacementDocs.push(cur.slice(index));
+        }
+
+        if (replacementDocs.length === 1) {
+          return replacementDocs[0];
+        }
+
+        return replacementDocs;
+      }
+    }
+
+    return cur;
+  });
+}
