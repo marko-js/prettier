@@ -16,7 +16,6 @@ import {
   shorthandIdOrClassReg,
   styleReg,
   voidHTMLReg,
-  forceBreakTagsReg,
   enclosedNodeTypeReg,
   preserveSpaceTagsReg,
 } from "./constants";
@@ -458,9 +457,7 @@ export const printers: Record<string, Printer<Node>> = {
                           ? b.ifBreak("--", " --", { groupId })
                           : "--",
                         opts.markoSyntax === "html"
-                          ? preserveSpace || isFirst
-                            ? ""
-                            : b.softline
+                          ? ""
                           : preserveSpace
                           ? b.hardline
                           : b.line,
@@ -484,25 +481,34 @@ export const printers: Record<string, Printer<Node>> = {
               );
             }
 
-            const sep =
+            const joinSep =
               (preserveSpace || !textOnly) &&
               (opts.markoSyntax === "concise" ||
-                forceBreakTagsReg.test(literalTagName) ||
                 node.body.body.some((child) => child.type === "MarkoScriptlet"))
                 ? b.hardline
                 : preserveSpace
                 ? ""
                 : b.softline;
+            const wrapSep =
+              !preserveSpace &&
+              opts.markoSyntax === "html" &&
+              (node.var ||
+                node.body.params.length ||
+                node.arguments?.length ||
+                node.attributes.length ||
+                node.body.body.some((child) => !isTextLike(child, node)))
+                ? b.hardline
+                : joinSep;
 
             if (opts.markoSyntax === "html") {
               doc.push(">");
             }
 
-            if (sep) {
-              doc.push(b.indent([sep, b.join(sep, bodyDocs)]));
+            if (joinSep || wrapSep) {
+              doc.push(b.indent([wrapSep, b.join(joinSep, bodyDocs)]));
 
               if (opts.markoSyntax === "html") {
-                doc.push(sep);
+                doc.push(wrapSep);
               }
             } else {
               doc.push(...bodyDocs);
