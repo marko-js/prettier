@@ -34,6 +34,4 @@ export const voidHTMLReg =
   /^(?:area|b(?:ase|r)|col|embed|hr|i(?:mg|nput)|keygen|link|meta|param|source|track|wbr)$/;
 export const shorthandIdOrClassReg =
   /^[a-zA-Z0-9_$][a-zA-Z0-9_$-]*(?:\s+[a-zA-Z0-9_$][a-zA-Z0-9_$-]*)*$/;
-export const forceBreakTagsReg =
-  /^(?:html|head|body|script|style|for|if|else(?:-if)|while|async|set|try)$/;
 export const preserveSpaceTagsReg = /^(?:textarea|pre)$/;
