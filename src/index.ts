@@ -355,17 +355,24 @@ export const printers: Record<string, Printer<Node>> = {
               const childNode = childPath.getValue();
 
               if (
-                (literalTagName === "style" ||
-                  opts.markoSyntax === "concise") &&
                 t.isMarkoAttribute(childNode) &&
-                (childNode.name === "class" || childNode.name === "id") &&
-                t.isStringLiteral(childNode.value) &&
-                !childNode.modifier &&
-                shorthandIdOrClassReg.test(childNode.value.value)
+                (childNode.name === "class" || childNode.name === "id")
               ) {
-                const symbol = childNode.name === "class" ? "." : "#";
-                doc[shorthandIndex] +=
-                  symbol + childNode.value.value.split(/ +/).join(symbol);
+                if (
+                  (literalTagName === "style" ||
+                    opts.markoSyntax === "concise") &&
+                  t.isStringLiteral(childNode.value) &&
+                  !childNode.modifier &&
+                  shorthandIdOrClassReg.test(childNode.value.value)
+                ) {
+                  const symbol = childNode.name === "class" ? "." : "#";
+                  doc[shorthandIndex] +=
+                    symbol + childNode.value.value.split(/ +/).join(symbol);
+                } else {
+                  // Fix issue where class/id shorthands don't have the correct source location when merged.
+                  childNode.value.loc = null;
+                  attrsDoc.push(print(childPath));
+                }
               } else if ((childNode as t.MarkoAttribute).default) {
                 doc.push(print(childPath));
               } else {
