@@ -750,7 +750,7 @@ export const printers: Record<string, Printer<Node>> = {
             (toDoc as any)(code, { parser }, { stripTrailingHardline: true })
           );
         } catch {
-          return [b.trim, asLiteralTextContent(code)];
+          return [asLiteralTextContent(code)];
         }
       }
     },
