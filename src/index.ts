@@ -136,7 +136,7 @@ export const parsers: Record<string, Parser<Node>> = {
 
       opts.originalText = text;
       opts.markoLinePositions = [0];
-      opts.markoScriptParser = "babel";
+      opts.markoScriptParser = "babel-ts";
       opts.markoPreservingSpace = false;
 
       for (let i = 0; i < text.length; i++) {
