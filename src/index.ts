@@ -9,6 +9,7 @@ import {
   getFileInfo,
   SupportOptions,
   AstPath,
+  CustomParser,
 } from "prettier";
 import { compileSync, types as t } from "@marko/compiler";
 import {
@@ -35,6 +36,10 @@ const defaultFilePath = resolve("index.marko");
 const { builders: b, utils } = doc;
 const identity = <T>(val: T) => val;
 const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
+const expressionParser: CustomParser = (code, parsers, options) => {
+  const ast = parsers["babel-ts"](`(${code});`, options);
+  return { ...ast, program: ast.program.body[0].expression };
+};
 
 export const languages: SupportLanguage[] = [
   {
@@ -682,13 +687,14 @@ export const printers: Record<string, Printer<Node>> = {
                   }
 
                   return contents;
-                }
+                },
+                node.code
               );
             }
             case "params": {
               return tryPrintEmbed(
                 `(${node.code})=>_`,
-                "__js_expression",
+                expressionParser,
                 (doc: any) => {
                   const { contents } = doc.contents[0];
                   if (Array.isArray(contents) && contents[0].startsWith("(")) {
@@ -699,7 +705,8 @@ export const printers: Record<string, Printer<Node>> = {
                   }
 
                   return contents;
-                }
+                },
+                node.code
               );
             }
             case "script":
@@ -716,7 +723,7 @@ export const printers: Record<string, Printer<Node>> = {
         case "MarkoClass":
           return (toDoc as any)(
             `class ${getOriginalCodeForNode(opts, node.body)}`,
-            { parser: "__js_expression" },
+            { parser: expressionParser },
             { stripTrailingHardline: true }
           );
         case "File":
@@ -736,21 +743,22 @@ export const printers: Record<string, Printer<Node>> = {
       } else {
         return tryPrintEmbed(
           getOriginalCodeForNode(opts, node),
-          "__js_expression"
+          expressionParser
         );
       }
 
       function tryPrintEmbed(
         code: string,
-        parser: string,
-        normalize: (doc: Doc) => Doc = identity
+        parser: string | CustomParser,
+        normalize: (doc: Doc) => Doc = identity,
+        fallback: string = code
       ) {
         try {
           return normalize(
             (toDoc as any)(code, { parser }, { stripTrailingHardline: true })
           );
         } catch {
-          return [asLiteralTextContent(code)];
+          return [asLiteralTextContent(fallback)];
         }
       }
     },
