@@ -1,7 +1,8 @@
 import { ParserOptions } from "prettier";
 import { Node } from "../constants";
 import locToPos from "./loc-to-pos";
-import generate from "@babel/generator";
+import * as babelGenerator from "@babel/generator";
+const generate = babelGenerator.default;
 
 export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
   const literal = literalToString(node);
