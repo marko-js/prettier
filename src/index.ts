@@ -37,8 +37,16 @@ const { builders: b, utils } = doc;
 const identity = <T>(val: T) => val;
 const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
 const expressionParser: CustomParser = (code, parsers, options) => {
-  const ast = parsers["babel-ts"](`(${code});`, options);
-  return { ...ast, program: ast.program.body[0].expression };
+  const ast = parsers["babel-ts"](code, options);
+  const { tokens, comments, range } = ast;
+  const node = ast.program.body[0].expression;
+  return {
+    type: "JsExpressionRoot",
+    tokens,
+    comments,
+    node,
+    range,
+  };
 };
 
 export const languages: SupportLanguage[] = [
@@ -693,7 +701,7 @@ export const printers: Record<string, Printer<Node>> = {
             }
             case "params": {
               return tryPrintEmbed(
-                `(${node.code})=>_`,
+                toExpression(`(${node.code})=>_`),
                 expressionParser,
                 (doc: any) => {
                   const { contents } = doc.contents[0];
@@ -722,7 +730,7 @@ export const printers: Record<string, Printer<Node>> = {
 
         case "MarkoClass":
           return (toDoc as any)(
-            `class ${getOriginalCodeForNode(opts, node.body)}`,
+            toExpression(`class ${getOriginalCodeForNode(opts, node.body)}`),
             { parser: expressionParser },
             { stripTrailingHardline: true }
           );
@@ -742,7 +750,7 @@ export const printers: Record<string, Printer<Node>> = {
         );
       } else {
         return tryPrintEmbed(
-          getOriginalCodeForNode(opts, node),
+          toExpression(getOriginalCodeForNode(opts, node)),
           expressionParser
         );
       }
@@ -801,4 +809,8 @@ function replaceEmbeddedPlaceholders(doc: Doc, placeholders: Doc[]) {
 
     return cur;
   });
+}
+
+function toExpression(code: string) {
+  return `(${code}\n)`;
 }

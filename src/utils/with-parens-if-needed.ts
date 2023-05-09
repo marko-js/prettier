@@ -11,15 +11,17 @@ export default function withParensIfNeeded(
   getValDoc: () => Doc
 ) {
   if (
-    !enclosedNodeTypeReg.test(node.type) &&
-    outerCodeMatches(
-      doc.printer.printDocToString(getValDoc(), {
-        ...opts,
-        printWidth: 0,
-      }).formatted,
-      /\s|>/y,
-      opts.markoAttrParen
-    )
+    (node as any).leadingComments?.length ||
+    (node as any).trailingComments?.length ||
+    (!enclosedNodeTypeReg.test(node.type) &&
+      outerCodeMatches(
+        doc.printer.printDocToString(getValDoc(), {
+          ...opts,
+          printWidth: 0,
+        }).formatted,
+        /\s|>/y,
+        opts.markoAttrParen
+      ))
   ) {
     return ["(", b.indent([b.softline, getValDoc()]), b.softline, ")"];
   }
