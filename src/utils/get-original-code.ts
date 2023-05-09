@@ -5,9 +5,6 @@ import babelGenerator from "@babel/generator";
 const generate = (babelGenerator as any).default || babelGenerator;
 
 export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
-  const literal = literalToString(node);
-  if (literal !== undefined) return literal;
-
   const loc = node.loc;
   if (!loc) {
     return generate(node as any, {
@@ -18,10 +15,30 @@ export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
     }).code;
   }
 
-  return opts.originalText.slice(
-    locToPos(loc.start, opts),
-    locToPos(loc.end, opts)
-  );
+  let start = loc.start;
+  if (node.leadingComments?.length) {
+    const commentStart = node.leadingComments[0].loc.start;
+    if (
+      commentStart.line < start.line ||
+      (commentStart.line === start.line && commentStart.column < start.column)
+    ) {
+      start = commentStart;
+    }
+  }
+
+  let end = loc.end;
+  if (node.trailingComments?.length) {
+    const commentEnd =
+      node.trailingComments[node.trailingComments.length - 1].loc.end;
+    if (
+      commentEnd.line > end.line ||
+      (commentEnd.line === end.line && commentEnd.column > end.column)
+    ) {
+      end = commentEnd;
+    }
+  }
+
+  return opts.originalText.slice(locToPos(start, opts), locToPos(end, opts));
 }
 
 export function getOriginalCodeForList(
@@ -30,17 +47,4 @@ export function getOriginalCodeForList(
   list: Node[]
 ) {
   return list.map((node) => getOriginalCodeForNode(opts, node)).join(sep);
-}
-
-function literalToString(node: Node) {
-  switch (node.type) {
-    case "StringLiteral":
-      return `"${node.value.replace(/(["\\])/g, "\\$1")}"`;
-    case "NumericLiteral":
-      return node.value.toString();
-    case "BooleanLiteral":
-      return node.value ? "true" : "false";
-    case "NullLiteral":
-      return "null";
-  }
 }
