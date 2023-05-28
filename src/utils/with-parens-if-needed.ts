@@ -1,30 +1,33 @@
-import { doc, Doc, ParserOptions } from "prettier";
+import { doc, Doc, format, ParserOptions } from "prettier";
 import { Node, enclosedNodeTypeReg } from "../constants";
 import outerCodeMatches from "./outer-code-matches";
+import { getOriginalCodeForNode } from "./get-original-code";
 
 const { builders: b } = doc;
 
 export default function withParensIfNeeded(
   node: Node,
   opts: ParserOptions,
-  /* must use a factory function because `printDocToString` has side effects */
-  getValDoc: () => Doc
+  doc: Doc
 ) {
   if (
     (node as any).leadingComments?.length ||
     (node as any).trailingComments?.length ||
     (!enclosedNodeTypeReg.test(node.type) &&
       outerCodeMatches(
-        doc.printer.printDocToString(getValDoc(), {
+        format(`_(${getOriginalCodeForNode(opts, node)})`, {
           ...opts,
           printWidth: 0,
-        }).formatted,
+          parser: opts.markoScriptParser,
+        })
+          .replace(/^_\(([\s\S]*)\);?$/m, "$1")
+          .trim(),
         /\s|>/y,
         opts.markoAttrParen
       ))
   ) {
-    return ["(", b.indent([b.softline, getValDoc()]), b.softline, ")"];
+    return ["(", b.indent([b.softline, doc]), b.softline, ")"];
   }
 
-  return getValDoc();
+  return doc;
 }

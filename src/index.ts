@@ -17,7 +17,6 @@ import {
   shorthandIdOrClassReg,
   styleReg,
   voidHTMLReg,
-  enclosedNodeTypeReg,
   preserveSpaceTagsReg,
 } from "./constants";
 import locToPos from "./utils/loc-to-pos";
@@ -337,7 +336,10 @@ export const printers: Record<string, Printer<Node>> = {
                 "(",
                 b.indent([
                   b.softline,
-                  b.join([",", b.line], tagPath.map(print, "arguments")),
+                  b.join(
+                    [",", b.line],
+                    tagPath.map((it) => print(it), "arguments")
+                  ),
                   opts.trailingComma ? b.ifBreak(",") : "",
                 ]),
                 b.softline,
@@ -364,32 +366,32 @@ export const printers: Record<string, Printer<Node>> = {
           if (node.attributes.length) {
             const attrsDoc: Doc[] = [];
 
-            tagPath.each((childPath) => {
-              const childNode = childPath.getValue();
+            tagPath.each((attrPath) => {
+              const attrNode = attrPath.getValue();
 
               if (
-                t.isMarkoAttribute(childNode) &&
-                (childNode.name === "class" || childNode.name === "id")
+                t.isMarkoAttribute(attrNode) &&
+                (attrNode.name === "class" || attrNode.name === "id")
               ) {
                 if (
                   (literalTagName === "style" ||
                     opts.markoSyntax === "concise") &&
-                  t.isStringLiteral(childNode.value) &&
-                  !childNode.modifier &&
-                  shorthandIdOrClassReg.test(childNode.value.value)
+                  t.isStringLiteral(attrNode.value) &&
+                  !attrNode.modifier &&
+                  shorthandIdOrClassReg.test(attrNode.value.value)
                 ) {
-                  const symbol = childNode.name === "class" ? "." : "#";
+                  const symbol = attrNode.name === "class" ? "." : "#";
                   doc[shorthandIndex] +=
-                    symbol + childNode.value.value.split(/ +/).join(symbol);
+                    symbol + attrNode.value.value.split(/ +/).join(symbol);
                 } else {
                   // Fix issue where class/id shorthands don't have the correct source location when merged.
-                  childNode.value.loc = null;
-                  attrsDoc.push(print(childPath));
+                  attrNode.value.loc = null;
+                  attrsDoc.push(print(attrPath));
                 }
-              } else if ((childNode as t.MarkoAttribute).default) {
-                doc.push(print(childPath));
+              } else if ((attrNode as t.MarkoAttribute).default) {
+                doc.push(print(attrPath));
               } else {
-                attrsDoc.push(print(childPath));
+                attrsDoc.push(print(attrPath));
               }
             }, "attributes");
 
@@ -423,13 +425,13 @@ export const printers: Record<string, Printer<Node>> = {
               let embeddedCode = "";
 
               tagPath.each(
-                (child) => {
-                  const node = child.getValue();
-                  if (node.type === "MarkoText") {
-                    embeddedCode += node.value;
+                (childPath) => {
+                  const childNode = childPath.getValue();
+                  if (childNode.type === "MarkoText") {
+                    embeddedCode += childNode.value;
                   } else {
                     embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
-                    placeholders.push(print(child));
+                    placeholders.push(print(childPath));
                   }
                 },
                 "body",
@@ -456,12 +458,12 @@ export const printers: Record<string, Printer<Node>> = {
             } else {
               let textDocs = [] as Doc[];
               tagPath.each(
-                (child, i) => {
-                  const childNode = child.getValue();
+                (childPath, i) => {
+                  const childNode = childPath.getValue();
                   const isText = isTextLike(childNode, node);
 
                   if (isText) {
-                    textDocs.push(print(child));
+                    textDocs.push(print(childPath));
                     if (i !== lastIndex) return;
                   } else {
                     textOnly = false;
@@ -490,10 +492,10 @@ export const printers: Record<string, Printer<Node>> = {
 
                     if (!isText) {
                       textDocs = [];
-                      bodyDocs.push(print(child));
+                      bodyDocs.push(print(childPath));
                     }
                   } else {
-                    bodyDocs.push(print(child));
+                    bodyDocs.push(print(childPath));
                   }
                 },
                 "body",
@@ -562,7 +564,10 @@ export const printers: Record<string, Printer<Node>> = {
                   "(",
                   b.indent([
                     b.softline,
-                    b.join([",", b.line], attrPath.map(print, "arguments")),
+                    b.join(
+                      [",", b.line],
+                      attrPath.map((it) => print(it), "arguments")
+                    ),
                     opts.trailingComma ? b.ifBreak(",") : "",
                   ]),
                   b.softline,
@@ -577,6 +582,17 @@ export const printers: Record<string, Printer<Node>> = {
               t.isFunctionExpression(value) &&
               !(value.id || value.async || value.generator)
             ) {
+              const methodBodyDocs: Doc[] = [];
+              (attrPath as any).each(
+                (childPath: AstPath<t.Statement>) => {
+                  if (childPath.getNode()?.type !== "EmptyStatement") {
+                    methodBodyDocs.push(print(childPath));
+                  }
+                },
+                "value",
+                "body",
+                "body"
+              );
               doc.push(
                 b.group([
                   "(",
@@ -590,28 +606,20 @@ export const printers: Record<string, Printer<Node>> = {
                     : "",
                   ")",
                 ]),
-                b.group([
-                  " {",
-                  b.indent([
-                    b.line,
-                    b.join(
-                      b.hardline,
-                      (attrPath as any).map(print, "value", "body", "body")
-                    ),
-                  ]),
-                  b.line,
-                  "}",
-                ])
+                methodBodyDocs.length
+                  ? b.group([
+                      " {",
+                      b.indent([b.line, b.join(b.hardline, methodBodyDocs)]),
+                      b.line,
+                      "}",
+                    ])
+                  : " {}"
               );
             } else {
               doc.push(
                 node.bound ? ":=" : "=",
                 b.group(
-                  enclosedNodeTypeReg.test(node.type)
-                    ? attrPath.call(print, "value")
-                    : withParensIfNeeded(value, opts, () =>
-                        attrPath.call(print, "value")
-                      )
+                  withParensIfNeeded(value, opts, attrPath.call(print, "value"))
                 )
               );
             }
@@ -621,7 +629,9 @@ export const printers: Record<string, Printer<Node>> = {
         }
         case "MarkoSpreadAttribute": {
           return (["..."] as Doc[]).concat(
-            withParensIfNeeded(node.value, opts, () =>
+            withParensIfNeeded(
+              node.value,
+              opts,
               (path as AstPath<t.MarkoSpreadAttribute>).call(print, "value")
             )
           );
@@ -632,15 +642,22 @@ export const printers: Record<string, Printer<Node>> = {
             (path as AstPath<t.MarkoPlaceholder>).call(print, "value"),
             "}",
           ];
-        case "MarkoScriptlet":
+        case "MarkoScriptlet": {
+          const bodyDocs: Doc = [];
+          path.each((childPath) => {
+            if (childPath.getNode()?.type !== "EmptyStatement") {
+              bodyDocs.push(print(childPath));
+            }
+          }, "body");
           return withLineIfNeeded(
             node.body[0],
             opts,
             b.group([
               node.static ? "static " : "$ ",
-              withBlockIfNeeded(node.body, opts, () => path.map(print, "body")),
+              withBlockIfNeeded(node.body, opts, bodyDocs),
             ])
           );
+        }
         case "MarkoText": {
           const quote = opts.singleQuote ? "'" : '"';
           const escapedSpace = `\${${quote} ${quote}}`;
@@ -736,6 +753,7 @@ export const printers: Record<string, Printer<Node>> = {
           );
         case "File":
         case "Program":
+        case "EmptyStatement":
           return null;
         default:
           if (node.type.startsWith("Marko")) {
