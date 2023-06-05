@@ -11,7 +11,10 @@ import {
   AstPath,
   CustomParser,
 } from "prettier";
-import { compileSync, types as t } from "@marko/compiler";
+import * as defaultCompiler from "@marko/compiler";
+import type { types } from "@marko/compiler";
+import defaultConfig from "@marko/compiler/config";
+import * as defaultTranslator from "@marko/translator-default";
 import {
   Node,
   shorthandIdOrClassReg,
@@ -32,6 +35,7 @@ import {
 } from "./utils/get-original-code";
 
 const defaultFilePath = resolve("index.marko");
+const rootRequire = createRequire(defaultFilePath);
 const { builders: b, utils } = doc;
 const identity = <T>(val: T) => val;
 const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
@@ -47,6 +51,25 @@ const expressionParser: CustomParser = (code, parsers, options) => {
     range,
   };
 };
+
+const [{ compileSync, types: t }, config] = (() => {
+  try {
+    return [
+      rootRequire("@marko/compiler"),
+      rootRequire("@marko/compiler/config"),
+    ];
+  } catch {
+    return [defaultCompiler, defaultConfig];
+  }
+})() as [typeof defaultCompiler, typeof defaultConfig];
+
+const translator = (() => {
+  try {
+    return rootRequire(config.translator);
+  } catch {
+    return defaultTranslator;
+  }
+})();
 
 export const languages: SupportLanguage[] = [
   {
@@ -93,7 +116,6 @@ export const options: SupportOptions = {
     default: (() => {
       // By default we check if the installed parser supported unenclosed whitespace for all attrs.
       try {
-        const rootRequire = createRequire(defaultFilePath);
         let compilerRequire: NodeRequire;
 
         try {
@@ -132,6 +154,7 @@ export const parsers: Record<string, Parser<Node>> = {
         output: "source",
         sourceMaps: false,
         writeVersionComment: false,
+        translator,
         babelConfig: {
           caller: { name: "@marko/prettier" },
           babelrc: false,
@@ -257,7 +280,7 @@ export const printers: Record<string, Printer<Node>> = {
         case "MarkoCDATA":
           return asLiteralTextContent(`<![CDATA[${node.value}]]>`);
         case "MarkoTag": {
-          const tagPath = path as AstPath<t.MarkoTag>;
+          const tagPath = path as AstPath<types.MarkoTag>;
           const groupId = Symbol();
           const doc: Doc[] = [opts.markoSyntax === "html" ? "<" : ""];
           const { markoPreservingSpace } = opts;
@@ -388,7 +411,7 @@ export const printers: Record<string, Printer<Node>> = {
                   attrNode.value.loc = null;
                   attrsDoc.push(print(attrPath));
                 }
-              } else if ((attrNode as t.MarkoAttribute).default) {
+              } else if ((attrNode as types.MarkoAttribute).default) {
                 doc.push(print(attrPath));
               } else {
                 attrsDoc.push(print(attrPath));
@@ -547,7 +570,7 @@ export const printers: Record<string, Printer<Node>> = {
           return withLineIfNeeded(node, opts, b.group(doc, { id: groupId }));
         }
         case "MarkoAttribute": {
-          const attrPath = path as AstPath<t.MarkoAttribute>;
+          const attrPath = path as AstPath<types.MarkoAttribute>;
           const doc: Doc[] = [];
           const { value } = node;
 
@@ -584,7 +607,7 @@ export const printers: Record<string, Printer<Node>> = {
             ) {
               const methodBodyDocs: Doc[] = [];
               (attrPath as any).each(
-                (childPath: AstPath<t.Statement>) => {
+                (childPath: AstPath<types.Statement>) => {
                   if (childPath.getNode()?.type !== "EmptyStatement") {
                     methodBodyDocs.push(print(childPath));
                   }
@@ -632,14 +655,14 @@ export const printers: Record<string, Printer<Node>> = {
             withParensIfNeeded(
               node.value,
               opts,
-              (path as AstPath<t.MarkoSpreadAttribute>).call(print, "value")
+              (path as AstPath<types.MarkoSpreadAttribute>).call(print, "value")
             )
           );
         }
         case "MarkoPlaceholder":
           return [
             node.escape ? "${" : "$!{",
-            (path as AstPath<t.MarkoPlaceholder>).call(print, "value"),
+            (path as AstPath<types.MarkoPlaceholder>).call(print, "value"),
             "}",
           ];
         case "MarkoScriptlet": {
