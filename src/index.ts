@@ -363,7 +363,7 @@ export const printers: Record<string, Printer<Node>> = {
                     [",", b.line],
                     tagPath.map((it) => print(it), "arguments")
                   ),
-                  opts.trailingComma ? b.ifBreak(",") : "",
+                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
                 ]),
                 b.softline,
                 ")",
@@ -591,7 +591,7 @@ export const printers: Record<string, Printer<Node>> = {
                       [",", b.line],
                       attrPath.map((it) => print(it), "arguments")
                     ),
-                    opts.trailingComma ? b.ifBreak(",") : "",
+                    opts.trailingComma === "all" ? b.ifBreak(",") : "",
                   ]),
                   b.softline,
                   ")",
