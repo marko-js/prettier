@@ -5,11 +5,7 @@ import { getOriginalCodeForNode } from "./get-original-code";
 
 const { builders: b } = doc;
 
-export default function withParensIfNeeded(
-  node: Node,
-  opts: ParserOptions,
-  doc: Doc
-) {
+export function withParensIfNeeded(node: Node, opts: ParserOptions, doc: Doc) {
   if (
     (node as any).leadingComments?.length ||
     (node as any).trailingComments?.length ||
@@ -26,7 +22,35 @@ export default function withParensIfNeeded(
         opts.markoAttrParen
       ))
   ) {
-    return ["(", b.indent([b.softline, doc]), b.softline, ")"];
+    return b.group(["(", b.indent([b.softline, doc]), b.softline, ")"]);
+  }
+
+  return doc;
+}
+
+export function withParensIfBreak(node: Node, opts: ParserOptions, doc: Doc) {
+  if (
+    (node as any).leadingComments?.length ||
+    (node as any).trailingComments?.length ||
+    (!enclosedNodeTypeReg.test(node.type) &&
+      outerCodeMatches(
+        format(`_(${getOriginalCodeForNode(opts, node)})`, {
+          ...opts,
+          printWidth: 0,
+          parser: opts.markoScriptParser,
+        })
+          .replace(/^_\(([\s\S]*)\);?$/m, "$1")
+          .trim(),
+        /\n/y,
+        true
+      ))
+  ) {
+    return b.group([
+      b.ifBreak("(", ""),
+      b.indent([b.softline, doc]),
+      b.softline,
+      b.ifBreak(")", ""),
+    ]);
   }
 
   return doc;
