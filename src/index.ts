@@ -10,6 +10,7 @@ import {
   SupportOptions,
   AstPath,
   CustomParser,
+  ParserOptions,
 } from "prettier";
 import * as defaultCompiler from "@marko/compiler";
 import type { types } from "@marko/compiler";
@@ -27,7 +28,10 @@ import callEmbed from "./utils/call-embed";
 import isTextLike from "./utils/is-text-like";
 import withLineIfNeeded from "./utils/with-line-if-needed";
 import withBlockIfNeeded from "./utils/with-block-if-needed";
-import withParensIfNeeded from "./utils/with-parens-if-needed";
+import {
+  withParensIfNeeded,
+  withParensIfBreak,
+} from "./utils/with-parens-if-needed";
 import asLiteralTextContent from "./utils/as-literal-text-content";
 import {
   getOriginalCodeForNode,
@@ -667,19 +671,23 @@ export const printers: Record<string, Printer<Node>> = {
           ];
         case "MarkoScriptlet": {
           const bodyDocs: Doc = [];
+          const prefix = node.static ? "static" : "$";
           path.each((childPath) => {
-            if (childPath.getNode()?.type !== "EmptyStatement") {
-              bodyDocs.push(print(childPath));
+            const childNode = childPath.getNode() as types.Statement;
+            if (childNode && childNode.type !== "EmptyStatement") {
+              bodyDocs.push(
+                withLineIfNeeded(
+                  childNode,
+                  opts,
+                  printSpecialDeclaration(childPath, prefix, opts, print) || [
+                    prefix + " ",
+                    withBlockIfNeeded(childNode, opts, childPath.call(print)),
+                  ]
+                )
+              );
             }
           }, "body");
-          return withLineIfNeeded(
-            node.body[0],
-            opts,
-            b.group([
-              node.static ? "static " : "$ ",
-              withBlockIfNeeded(node.body, opts, bodyDocs),
-            ])
-          );
+          return b.join(b.hardline, bodyDocs);
         }
         case "MarkoText": {
           const quote = opts.singleQuote ? "'" : '"';
@@ -778,6 +786,18 @@ export const printers: Record<string, Printer<Node>> = {
         case "Program":
         case "EmptyStatement":
           return null;
+        case "ExportNamedDeclaration":
+          if (node.declaration) {
+            const printedDeclaration = (
+              path as AstPath<typeof node & { declaration: types.Declaration }>
+            ).call(
+              (childPath) =>
+                printSpecialDeclaration(childPath, "export", opts, print),
+              "declaration"
+            );
+            if (printedDeclaration) return printedDeclaration;
+          }
+          break;
         default:
           if (node.type.startsWith("Marko")) {
             return null;
@@ -813,6 +833,85 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
+
+function printSpecialDeclaration(
+  path: AstPath<Node>,
+  prefix: string,
+  opts: ParserOptions<Node>,
+  print: (path: AstPath<Node>) => doc.builders.Doc
+) {
+  const node = path.getValue();
+  switch (node.type) {
+    case "TSTypeAliasDeclaration":
+      return [
+        prefix + " type ",
+        node.id.name,
+        node.typeParameters
+          ? [
+              "<",
+              b.group([
+                b.indent([
+                  b.softline,
+                  (path as AstPath<typeof node>).call(
+                    (paramsPath) =>
+                      b.join(
+                        [",", b.line],
+                        paramsPath.map((param) => param.call(print))
+                      ),
+                    "typeParameters",
+                    "params"
+                  ),
+                ]),
+                b.softline,
+                ">",
+              ]),
+            ]
+          : "",
+        " = ",
+        withParensIfBreak(
+          node.typeAnnotation,
+          opts,
+          (path as AstPath<typeof node>).call(print, "typeAnnotation")
+        ),
+        opts.semi ? ";" : "",
+      ];
+    case "VariableDeclaration": {
+      return b.join(
+        b.hardline,
+        (path as AstPath<typeof node>).map((declPath) => {
+          const decl = declPath.getValue();
+          decl.id;
+          return [
+            prefix + " " + (node.declare ? "declare " : "") + node.kind + " ",
+            callEmbed(
+              print,
+              declPath,
+              "var",
+              getOriginalCodeForNode(opts, decl.id)
+            ),
+            decl.init
+              ? [
+                  " = ",
+                  withParensIfBreak(
+                    decl.init,
+                    opts,
+                    (
+                      declPath as AstPath<
+                        types.VariableDeclarator & {
+                          init: types.Expression;
+                        }
+                      >
+                    ).call(print, "init")
+                  ),
+                ]
+              : "",
+            opts.semi ? ";" : "",
+          ];
+        }, "declarations")
+      );
+    }
+  }
+}
 
 function replaceEmbeddedPlaceholders(doc: Doc, placeholders: Doc[]) {
   if (!placeholders.length) return doc;
