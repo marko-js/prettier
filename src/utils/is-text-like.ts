@@ -1,9 +1,8 @@
 import type { types as t } from "@marko/compiler";
-import { Node } from "../constants";
 
 export default function isTextLike(
-  node: Node,
-  parent: t.MarkoTag | t.Program
+  node: t.Node,
+  parent: t.MarkoTag | t.Program,
 ): boolean {
   if (isText(node)) {
     return true;
@@ -29,6 +28,6 @@ export default function isTextLike(
   return false;
 }
 
-function isText(node: Node) {
+function isText(node: t.Node) {
   return node.type === "MarkoText" || node.type === "MarkoPlaceholder";
 }

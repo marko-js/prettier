@@ -14,7 +14,7 @@ for (const entry of fs.readdirSync(fixturesDir)) {
   it(name, async () => {
     const filepath = path.relative(cwd, path.join(fixturesDir, entry));
     const source = await fs.promises.readFile(filepath, "utf-8");
-    const formatAndCheck = (opts?: Partial<Options>) => {
+    const formatAndCheck = async (opts?: Partial<Options>) => {
       const fullOpts = {
         filepath,
         parser: "marko",
@@ -22,7 +22,7 @@ for (const entry of fs.readdirSync(fixturesDir)) {
         ...opts,
       };
 
-      const formatted = format(source, fullOpts);
+      const formatted = await format(source, fullOpts);
       // TODO: need to fix idempotency.
       // const reformatted = format(formatted, fullOpts);
       // assert.equal(reformatted, formatted);
@@ -30,26 +30,31 @@ for (const entry of fs.readdirSync(fixturesDir)) {
     };
 
     await Promise.all([
-      snapshot(formatAndCheck({ markoAttrParen: false }), "auto.marko"),
+      snapshot(() => formatAndCheck({ markoAttrParen: false }), {
+        file: "auto.marko",
+      }),
       snapshot(
-        formatAndCheck({
-          markoSyntax: "html",
-          markoAttrParen: false,
-        }),
-        "html.marko"
+        () =>
+          formatAndCheck({
+            markoSyntax: "html",
+            markoAttrParen: false,
+          }),
+        { file: "html.marko" },
       ),
       snapshot(
-        formatAndCheck({
-          markoSyntax: "concise",
-          markoAttrParen: false,
-        }),
-        "concise.marko"
+        () =>
+          formatAndCheck({
+            markoSyntax: "concise",
+            markoAttrParen: false,
+          }),
+        { file: "concise.marko" },
       ),
       snapshot(
-        formatAndCheck({
-          markoAttrParen: true,
-        }),
-        "with-parens.marko"
+        () =>
+          formatAndCheck({
+            markoAttrParen: true,
+          }),
+        { file: "with-parens.marko" },
       ),
     ]);
   });

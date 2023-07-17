@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [16.x, 18.x]
+        node: [18, 20]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Use node@${{ matrix.node }}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
           cache: "npm"
@@ -28,4 +28,4 @@ jobs:
       - name: Run tests
         run: npm run ci:test
       - name: Report code coverage
-        run: npm run ci:report
+        uses: codecov/codecov-action@v3

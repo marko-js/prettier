@@ -1,14 +1,14 @@
 import { doc, Doc, ParserOptions } from "prettier";
+import type { types as t } from "@marko/compiler";
 
-import { Node } from "../constants";
 import locToPos from "./loc-to-pos";
 
 const { builders: b } = doc;
 
 export default function withLineIfNeeded(
-  node: Node,
-  opts: ParserOptions<Node>,
-  doc: Doc
+  node: t.Node,
+  opts: ParserOptions<t.Node>,
+  doc: Doc,
 ) {
   const { originalText } = opts;
   let pos = locToPos(node.loc!.start, opts);

@@ -1,32 +1,21 @@
 import type { types as t } from "@marko/compiler";
-import { doc, Doc, format, ParserOptions } from "prettier";
+import { doc as d, type Doc } from "prettier";
 import { enclosedNodeTypeReg } from "../constants";
 import outerCodeMatches from "./outer-code-matches";
-import { getOriginalCodeForNode } from "./get-original-code";
+import printDoc from "./print-doc";
 
-const { builders: b } = doc;
+const { builders: b } = d;
 
-export default function withBlockIfNeeded(
-  node: t.Statement,
-  opts: ParserOptions,
-  docs: Doc
-) {
+export default function withBlockIfNeeded(node: t.Statement, doc: Doc) {
   if (
     !enclosedNodeTypeReg.test(node.type) &&
-    outerCodeMatches(
-      format(getOriginalCodeForNode(opts, node), {
-        ...opts,
-        printWidth: 0,
-        parser: opts.markoScriptParser,
-      }).trim(),
-      /[\n\r]/y
-    )
+    outerCodeMatches(printDoc(doc).trim(), /[\n\r]/y)
   ) {
     return b.group([
-      b.indent([b.ifBreak(["{", b.line]), docs]),
+      b.indent([b.ifBreak(["{", b.line]), doc]),
       b.ifBreak([b.line, "}"]),
     ]);
   }
 
-  return docs;
+  return doc;
 }

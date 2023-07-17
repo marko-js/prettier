@@ -30,6 +30,9 @@
   </a>
 </h1>
 
+> Note:
+> For prettier@2 or below use `prettier-plugin-marko@1`.
+
 A [Prettier](https://prettier.io/) plugin for parsing and printing Marko files.
 
 # Installation

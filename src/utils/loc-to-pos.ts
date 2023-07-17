@@ -1,12 +1,12 @@
 import { ParserOptions } from "prettier";
-import { Node } from "../constants";
+import type { types as t } from "@marko/compiler";
 
 export default function locToPos(
   loc: {
     line: number;
     column: number;
   },
-  opts: ParserOptions<Node>
+  opts: ParserOptions<t.Node>,
 ) {
   const { markoLinePositions } = opts;
   return (

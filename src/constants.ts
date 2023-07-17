@@ -1,5 +1,3 @@
-import type * as Compiler from "@marko/compiler";
-
 declare module "prettier" {
   interface Options {
     markoSyntax?: "auto" | "html" | "concise";
@@ -18,15 +16,8 @@ declare module "prettier" {
   }
 }
 
-export type MarkoEmbedNode = {
-  type: "_MarkoEmbed";
-  mode: string;
-  code: string;
-  loc: undefined;
-};
-
-export type Node = Compiler.types.Node | MarkoEmbedNode;
-
+export const scriptParser = "babel-ts";
+export const expressionParser = "__ts_expression";
 export const enclosedNodeTypeReg =
   /^(?:Identifier|.*Literal|(?:Object|Array|Parenthesized|Record|Tuple)Expression)$/;
 export const styleReg = /^style((?:\.[^\s\\/:*?"<>|({]+)+)?\s*\{?/;

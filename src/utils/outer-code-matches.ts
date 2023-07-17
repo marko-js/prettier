@@ -71,7 +71,7 @@ enclosedPatterns.push(
   {
     // RegExp
     match: /\/(?:\\.|\[(?:\\.|[^\]\\]+)\]|[^[/\\])+\/[a-z]*/iy,
-  }
+  },
 );
 
 const unenclosedPatterns: Pattern[] = [
@@ -89,7 +89,7 @@ const unenclosedPatterns: Pattern[] = [
 export default function outerCodeMatches(
   str: string,
   test: RegExp,
-  enclosed?: boolean
+  enclosed?: boolean,
 ) {
   const stack: NestedPattern[] = [
     {
