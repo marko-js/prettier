@@ -1,4 +1,4 @@
-import { types as t } from "@marko/compiler";
+import type * as Compiler from "@marko/compiler";
 
 declare module "prettier" {
   interface Options {
@@ -7,6 +7,8 @@ declare module "prettier" {
   }
 
   interface ParserOptions {
+    markoCompiler?: typeof Compiler;
+    markoCompilerConfig?: Compiler.Config;
     markoSyntax?: "auto" | "html" | "concise";
     markoAttrParen?: boolean;
     // @internal
@@ -25,7 +27,7 @@ export type MarkoEmbedNode = {
   loc: undefined;
 };
 
-export type Node = t.Node | MarkoEmbedNode;
+export type Node = Compiler.types.Node | MarkoEmbedNode;
 
 export const enclosedNodeTypeReg =
   /^(?:Identifier|.*Literal|(?:Object|Array|Parenthesized|Record|Tuple)Expression)$/;
