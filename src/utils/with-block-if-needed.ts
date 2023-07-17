@@ -1,4 +1,4 @@
-import { types as t } from "@marko/compiler";
+import type { types as t } from "@marko/compiler";
 import { doc, Doc, format, ParserOptions } from "prettier";
 import { enclosedNodeTypeReg } from "../constants";
 import outerCodeMatches from "./outer-code-matches";

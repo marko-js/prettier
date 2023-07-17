@@ -12,10 +12,8 @@ import {
   CustomParser,
   ParserOptions,
 } from "prettier";
-import * as defaultCompiler from "@marko/compiler";
-import type { types } from "@marko/compiler";
-import defaultConfig from "@marko/compiler/config";
-import * as defaultTranslator from "@marko/translator-default";
+import type * as Compiler from "@marko/compiler";
+import type { types, Config } from "@marko/compiler";
 import {
   Node,
   shorthandIdOrClassReg,
@@ -55,25 +53,6 @@ const expressionParser: CustomParser = (code, parsers, options) => {
     range,
   };
 };
-
-const [{ compileSync, types: t }, config] = (() => {
-  try {
-    return [
-      rootRequire("@marko/compiler"),
-      rootRequire("@marko/compiler/config"),
-    ];
-  } catch {
-    return [defaultCompiler, defaultConfig];
-  }
-})() as [typeof defaultCompiler, typeof defaultConfig];
-
-const translator = (() => {
-  try {
-    return rootRequire(config.translator);
-  } catch {
-    return defaultTranslator;
-  }
-})();
 
 export const languages: SupportLanguage[] = [
   {
@@ -120,16 +99,9 @@ export const options: SupportOptions = {
     default: (() => {
       // By default we check if the installed parser supported unenclosed whitespace for all attrs.
       try {
-        let compilerRequire: NodeRequire;
-
-        try {
-          compilerRequire = createRequire(
-            rootRequire.resolve("@marko/compiler")
-          );
-        } catch {
-          compilerRequire = createRequire(rootRequire.resolve("marko"));
-        }
-
+        const compilerRequire = createRequire(
+          rootRequire.resolve("@marko/compiler")
+        );
         const [major, minor] = (
           compilerRequire("htmljs-parser/package.json") as { version: string }
         ).version
@@ -151,6 +123,36 @@ export const parsers: Record<string, Parser<Node>> = {
     astFormat: "marko-ast",
     parse(text, _parsers, opts) {
       const { filepath = defaultFilePath } = opts;
+
+      const [{ compileSync, types: t }, config] = (() => {
+        try {
+          return [
+            (opts.markoCompiler ||= rootRequire("@marko/compiler")),
+            (opts.markoCompilerConfig ||= rootRequire(
+              "@marko/compiler/config"
+            ).default),
+          ];
+        } catch (cause) {
+          throw new Error(
+            "You must have @marko/compiler installed to use prettier-plugin-marko.",
+            { cause }
+          );
+        }
+      })() as [typeof Compiler, Config];
+
+      const translator = (() => {
+        try {
+          return rootRequire(config.translator);
+        } catch (cause) {
+          throw new Error(
+            `Unable to load Marko translator at ${JSON.stringify(
+              config.translator
+            )}. Please install the Marko runtime.`,
+            { cause }
+          );
+        }
+      })();
+
       const { ast } = compileSync(`${text}\n`, filepath, {
         ast: true,
         code: false,
@@ -224,6 +226,7 @@ export const printers: Record<string, Printer<Node>> = {
   "marko-ast": {
     print(path, opts, print) {
       const node = path.getValue();
+      const t = opts.markoCompiler!.types;
 
       switch (node.type) {
         case "File":
@@ -719,6 +722,7 @@ export const printers: Record<string, Printer<Node>> = {
     },
     embed(path, print, toDoc, opts) {
       const node = path.getValue();
+      const t = opts.markoCompiler!.types;
 
       switch (node.type) {
         case "_MarkoEmbed":
