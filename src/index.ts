@@ -54,6 +54,9 @@ const expressionParser: CustomParser = (code, parsers, options) => {
   };
 };
 
+let currentCompiler: typeof Compiler;
+let currentConfig: Config;
+
 export const languages: SupportLanguage[] = [
   {
     name: "marko",
@@ -127,10 +130,8 @@ export const parsers: Record<string, Parser<Node>> = {
       const [{ compileSync, types: t }, config] = (() => {
         try {
           return [
-            (opts.markoCompiler ||= rootRequire("@marko/compiler")),
-            (opts.markoCompilerConfig ||= rootRequire(
-              "@marko/compiler/config"
-            ).default),
+            (currentCompiler ||= rootRequire("@marko/compiler")),
+            (currentConfig ||= rootRequire("@marko/compiler/config").default),
           ];
         } catch (cause) {
           throw new Error(
@@ -140,27 +141,14 @@ export const parsers: Record<string, Parser<Node>> = {
         }
       })() as [typeof Compiler, Config];
 
-      const translator = (() => {
-        try {
-          return rootRequire(config.translator);
-        } catch (cause) {
-          throw new Error(
-            `Unable to load Marko translator at ${JSON.stringify(
-              config.translator
-            )}. Please install the Marko runtime.`,
-            { cause }
-          );
-        }
-      })();
-
       const { ast } = compileSync(`${text}\n`, filepath, {
+        ...config,
         ast: true,
         code: false,
         optimize: false,
         output: "source",
         sourceMaps: false,
         writeVersionComment: false,
-        translator,
         babelConfig: {
           caller: { name: "@marko/prettier" },
           babelrc: false,
@@ -226,7 +214,7 @@ export const printers: Record<string, Printer<Node>> = {
   "marko-ast": {
     print(path, opts, print) {
       const node = path.getValue();
-      const t = opts.markoCompiler!.types;
+      const t = currentCompiler.types;
 
       switch (node.type) {
         case "File":
@@ -722,7 +710,7 @@ export const printers: Record<string, Printer<Node>> = {
     },
     embed(path, print, toDoc, opts) {
       const node = path.getValue();
-      const t = opts.markoCompiler!.types;
+      const t = currentCompiler.types;
 
       switch (node.type) {
         case "_MarkoEmbed":
@@ -837,6 +825,11 @@ export const printers: Record<string, Printer<Node>> = {
     },
   },
 };
+
+export function setCompiler(compiler: typeof Compiler, config: Config) {
+  currentCompiler = compiler;
+  currentConfig = config;
+}
 
 function printSpecialDeclaration(
   path: AstPath<Node>,
