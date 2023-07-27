@@ -4,15 +4,11 @@ declare module "prettier" {
   interface Options {
     markoSyntax?: "auto" | "html" | "concise";
     markoAttrParen?: boolean;
-    markoCompiler?: typeof Compiler;
-    markoCompilerConfig?: Compiler.Config;
   }
 
   interface ParserOptions {
     markoSyntax?: "auto" | "html" | "concise";
     markoAttrParen?: boolean;
-    markoCompiler?: typeof Compiler;
-    markoCompilerConfig?: Compiler.Config;
     // @internal
     markoLinePositions: number[];
     // @internal
