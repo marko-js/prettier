@@ -6,23 +6,21 @@ import {
   SupportLanguage,
   Parser,
   Printer,
-  getFileInfo,
   SupportOptions,
   AstPath,
-  CustomParser,
   ParserOptions,
 } from "prettier";
 import type * as Compiler from "@marko/compiler";
 import type { types, Config } from "@marko/compiler";
 import {
-  Node,
   shorthandIdOrClassReg,
   styleReg,
   voidHTMLReg,
   preserveSpaceTagsReg,
+  scriptParser,
+  expressionParser,
 } from "./constants";
 import locToPos from "./utils/loc-to-pos";
-import callEmbed from "./utils/call-embed";
 import isTextLike from "./utils/is-text-like";
 import withLineIfNeeded from "./utils/with-line-if-needed";
 import withBlockIfNeeded from "./utils/with-block-if-needed";
@@ -31,28 +29,14 @@ import {
   withParensIfBreak,
 } from "./utils/with-parens-if-needed";
 import asLiteralTextContent from "./utils/as-literal-text-content";
-import {
-  getOriginalCodeForNode,
-  getOriginalCodeForList,
-} from "./utils/get-original-code";
-
+import { getOriginalCodeForNode } from "./utils/get-original-code";
+type Node = types.Node;
 const defaultFilePath = resolve("index.marko");
 const rootRequire = createRequire(defaultFilePath);
 const { builders: b, utils } = doc;
 const identity = <T>(val: T) => val;
+const emptyArr = [] as const;
 const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
-const expressionParser: CustomParser = (code, parsers, options) => {
-  const ast = parsers["babel-ts"](code, options);
-  const { tokens, comments, range } = ast;
-  const node = ast.program.body[0].expression;
-  return {
-    type: "JsExpressionRoot",
-    tokens,
-    comments,
-    node,
-    range,
-  };
-};
 
 let currentCompiler: typeof Compiler;
 let currentConfig: Config;
@@ -74,7 +58,6 @@ export const languages: SupportLanguage[] = [
 
 export const options: SupportOptions = {
   markoSyntax: {
-    since: "",
     type: "choice",
     default: "auto",
     category: "Marko",
@@ -97,13 +80,12 @@ export const options: SupportOptions = {
   },
 
   markoAttrParen: {
-    since: "",
     type: "boolean",
     default: (() => {
       // By default we check if the installed parser supported unenclosed whitespace for all attrs.
       try {
         const compilerRequire = createRequire(
-          rootRequire.resolve("@marko/compiler")
+          rootRequire.resolve("@marko/compiler"),
         );
         const [major, minor] = (
           compilerRequire("htmljs-parser/package.json") as { version: string }
@@ -124,10 +106,10 @@ export const options: SupportOptions = {
 export const parsers: Record<string, Parser<Node>> = {
   marko: {
     astFormat: "marko-ast",
-    parse(text, _parsers, opts) {
+    async parse(text, opts) {
       const { filepath = defaultFilePath } = opts;
 
-      const [{ compileSync, types: t }, config] = (() => {
+      const [{ compile, types: t }, config] = (() => {
         try {
           return [
             (currentCompiler ||= rootRequire("@marko/compiler")),
@@ -136,13 +118,22 @@ export const parsers: Record<string, Parser<Node>> = {
         } catch (cause) {
           throw new Error(
             "You must have @marko/compiler installed to use prettier-plugin-marko.",
-            { cause }
+            { cause },
           );
         }
       })() as [typeof Compiler, Config];
 
-      const { ast } = compileSync(`${text}\n`, filepath, {
+      const translator = (() => {
+        try {
+          return rootRequire(config.translator);
+        } catch (err) {
+          throw new Error("Unable to find Marko translator.", { cause: err });
+        }
+      })();
+
+      const { ast } = await compile(`${text}\n`, filepath, {
         ...config,
+        translator,
         ast: true,
         code: false,
         optimize: false,
@@ -165,7 +156,6 @@ export const parsers: Record<string, Parser<Node>> = {
 
       opts.originalText = text;
       opts.markoLinePositions = [0];
-      opts.markoScriptParser = "babel-ts";
       opts.markoPreservingSpace = false;
 
       for (let i = 0; i < text.length; i++) {
@@ -199,22 +189,42 @@ export const parsers: Record<string, Parser<Node>> = {
         }
       }
 
+      // Patch issue where source locations for shorthand class/id attributes are messed up.
+      t.traverseFast(ast, (node) => {
+        if (node.type === "MarkoAttribute") {
+          switch (node.name) {
+            case "class":
+            case "id":
+              switch (node.value.type) {
+                case "StringLiteral":
+                case "ArrayExpression":
+                case "TemplateLiteral":
+                case "ObjectExpression":
+                  node.value.loc = null;
+                  break;
+              }
+              break;
+          }
+        }
+      });
+
       return ast;
     },
-    locStart() {
-      return 0;
+    locStart(node) {
+      return (node as any).loc?.start?.index || 0;
     },
-    locEnd() {
-      return 0;
+    locEnd(node) {
+      return (node as any).loc?.end?.index || 0;
     },
   },
 };
 
-export const printers: Record<string, Printer<Node>> = {
+export const printers: Record<string, Printer<types.Node>> = {
   "marko-ast": {
     print(path, opts, print) {
-      const node = path.getValue();
-      const t = currentCompiler.types;
+      const node = path.getNode();
+      if (!node) return "";
+      const { types: t } = currentCompiler;
 
       switch (node.type) {
         case "File":
@@ -225,7 +235,7 @@ export const printers: Record<string, Printer<Node>> = {
           const bodyDocs = [] as Doc[];
 
           path.each((child, i) => {
-            const childNode = child.getValue();
+            const childNode = child.getNode()!;
             const isText = isTextLike(childNode, node);
 
             if (isText) {
@@ -286,42 +296,8 @@ export const printers: Record<string, Printer<Node>> = {
             markoPreservingSpace ||
             (opts.markoPreservingSpace =
               preserveSpaceTagsReg.test(literalTagName));
-          let embedMode: string | undefined;
 
           if (literalTagName) {
-            if (literalTagName === "script") {
-              embedMode = "script";
-            } else if (literalTagName === "style") {
-              const [startContent, lang = ".css"] = styleReg.exec(
-                node.rawValue || literalTagName
-              )!;
-
-              embedMode = `style.${
-                getFileInfo.sync(opts.filepath + lang).inferredParser
-              }`;
-
-              if (startContent.endsWith("{")) {
-                // style { block }
-                const codeSartOffset = startContent.length;
-                const codeEndOffset = node.rawValue!.lastIndexOf("}");
-                const code = node.rawValue!.slice(
-                  codeSartOffset,
-                  codeEndOffset
-                );
-
-                return b.group([
-                  "style",
-                  lang === ".css" ? "" : lang,
-                  " {",
-                  b.indent([
-                    b.line,
-                    callEmbed(print, tagPath, embedMode, code),
-                  ]),
-                  b.line,
-                  "}",
-                ]);
-              }
-            }
             doc.push(literalTagName);
           } else {
             doc.push(
@@ -330,7 +306,7 @@ export const printers: Record<string, Printer<Node>> = {
                 b.indent([b.softline, tagPath.call(print, "name")]),
                 b.softline,
                 "}",
-              ])
+              ]),
             );
           }
 
@@ -339,12 +315,10 @@ export const printers: Record<string, Printer<Node>> = {
           if (node.var) {
             doc.push(
               "/",
-              callEmbed(
+              (tagPath as AstPath<types.MarkoTag & { var: types.LVal }>).call(
                 print,
-                tagPath,
                 "var",
-                getOriginalCodeForNode(opts, node.var)
-              )
+              ),
             );
           }
 
@@ -356,13 +330,16 @@ export const printers: Record<string, Printer<Node>> = {
                   b.softline,
                   b.join(
                     [",", b.line],
-                    tagPath.map((it) => print(it), "arguments")
+                    tagPath.map((it) => print(it), "arguments"),
                   ),
-                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                  opts.trailingComma === "all" &&
+                  !preventTrailingCommaTagArgs(literalTagName)
+                    ? b.ifBreak(",")
+                    : "",
                 ]),
                 b.softline,
                 ")",
-              ])
+              ]),
             );
           }
 
@@ -370,14 +347,17 @@ export const printers: Record<string, Printer<Node>> = {
             doc.push(
               b.group([
                 "|",
-                callEmbed(
-                  print,
-                  tagPath,
-                  "params",
-                  getOriginalCodeForList(opts, ",", node.body.params)
-                ),
+                b.indent([
+                  b.softline,
+                  b.join(
+                    [",", b.line],
+                    tagPath.map((it) => print(it), "body", "params"),
+                  ),
+                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                ]),
+                b.softline,
                 "|",
-              ])
+              ]),
             );
           }
 
@@ -385,15 +365,14 @@ export const printers: Record<string, Printer<Node>> = {
             const attrsDoc: Doc[] = [];
 
             tagPath.each((attrPath) => {
-              const attrNode = attrPath.getValue();
+              const attrNode = attrPath.getNode();
 
               if (
                 t.isMarkoAttribute(attrNode) &&
                 (attrNode.name === "class" || attrNode.name === "id")
               ) {
                 if (
-                  (literalTagName === "style" ||
-                    opts.markoSyntax === "concise") &&
+                  opts.markoSyntax === "concise" &&
                   t.isStringLiteral(attrNode.value) &&
                   !attrNode.modifier &&
                   shorthandIdOrClassReg.test(attrNode.value.value)
@@ -402,8 +381,6 @@ export const printers: Record<string, Printer<Node>> = {
                   doc[shorthandIndex] +=
                     symbol + attrNode.value.value.split(/ +/).join(symbol);
                 } else {
-                  // Fix issue where class/id shorthands don't have the correct source location when merged.
-                  attrNode.value.loc = null;
                   attrsDoc.push(print(attrPath));
                 }
               } else if ((attrNode as types.MarkoAttribute).default) {
@@ -424,7 +401,7 @@ export const printers: Record<string, Printer<Node>> = {
                     opts.markoSyntax === "concise"
                       ? b.ifBreak([b.line, "]"])
                       : b.ifBreak(b.line),
-                  ])
+                  ]),
                 );
               }
             }
@@ -437,89 +414,51 @@ export const printers: Record<string, Printer<Node>> = {
             const bodyDocs = [] as Doc[];
             let textOnly = true;
 
-            if (embedMode) {
-              let placeholderId = 0;
-              const placeholders = [] as Doc[];
-              let embeddedCode = "";
+            let textDocs = [] as Doc[];
+            tagPath.each(
+              (childPath, i) => {
+                const childNode = childPath.getNode()!;
+                const isText = isTextLike(childNode, node);
 
-              tagPath.each(
-                (childPath) => {
-                  const childNode = childPath.getValue();
-                  if (childNode.type === "MarkoText") {
-                    embeddedCode += childNode.value;
-                  } else {
-                    embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
-                    placeholders.push(print(childPath));
-                  }
-                },
-                "body",
-                "body"
-              );
+                if (isText) {
+                  textDocs.push(print(childPath));
+                  if (i !== lastIndex) return;
+                } else {
+                  textOnly = false;
+                }
 
-              const embeddedDoc = replaceEmbeddedPlaceholders(
-                callEmbed(print, tagPath, embedMode, embeddedCode),
-                placeholders
-              );
+                if (textDocs.length) {
+                  const isFirst = !bodyDocs.length;
+                  bodyDocs.push(
+                    b.group([
+                      opts.markoSyntax === "html"
+                        ? ""
+                        : isFirst
+                        ? b.ifBreak("--", " --", { groupId })
+                        : "--",
+                      opts.markoSyntax === "html"
+                        ? ""
+                        : preserveSpace
+                        ? b.hardline
+                        : b.line,
+                      preserveSpace ? textDocs : b.fill(textDocs),
+                      opts.markoSyntax === "html"
+                        ? ""
+                        : b.ifBreak([b.softline, "--"]),
+                    ]),
+                  );
 
-              bodyDocs.push(
-                b.group([
-                  opts.markoSyntax === "html"
-                    ? ""
-                    : b.ifBreak("--", " --", { groupId }),
-                  opts.markoSyntax === "html" ? "" : b.line,
-                  embeddedDoc,
-                  opts.markoSyntax === "html"
-                    ? ""
-                    : b.ifBreak([b.softline, "--"]),
-                ])
-              );
-            } else {
-              let textDocs = [] as Doc[];
-              tagPath.each(
-                (childPath, i) => {
-                  const childNode = childPath.getValue();
-                  const isText = isTextLike(childNode, node);
-
-                  if (isText) {
-                    textDocs.push(print(childPath));
-                    if (i !== lastIndex) return;
-                  } else {
-                    textOnly = false;
-                  }
-
-                  if (textDocs.length) {
-                    const isFirst = !bodyDocs.length;
-                    bodyDocs.push(
-                      b.group([
-                        opts.markoSyntax === "html"
-                          ? ""
-                          : isFirst
-                          ? b.ifBreak("--", " --", { groupId })
-                          : "--",
-                        opts.markoSyntax === "html"
-                          ? ""
-                          : preserveSpace
-                          ? b.hardline
-                          : b.line,
-                        preserveSpace ? textDocs : b.fill(textDocs),
-                        opts.markoSyntax === "html"
-                          ? ""
-                          : b.ifBreak([b.softline, "--"]),
-                      ])
-                    );
-
-                    if (!isText) {
-                      textDocs = [];
-                      bodyDocs.push(print(childPath));
-                    }
-                  } else {
+                  if (!isText) {
+                    textDocs = [];
                     bodyDocs.push(print(childPath));
                   }
-                },
-                "body",
-                "body"
-              );
-            }
+                } else {
+                  bodyDocs.push(print(childPath));
+                }
+              },
+              "body",
+              "body",
+            );
 
             const joinSep =
               (preserveSpace || !textOnly) &&
@@ -584,13 +523,16 @@ export const printers: Record<string, Printer<Node>> = {
                     b.softline,
                     b.join(
                       [",", b.line],
-                      attrPath.map((it) => print(it), "arguments")
+                      attrPath.map((it) => print(it), "arguments"),
                     ),
-                    opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                    opts.trailingComma === "all" &&
+                    !preventTrailingCommaAttrArgs(node.name)
+                      ? b.ifBreak(",")
+                      : "",
                   ]),
                   b.softline,
                   ")",
-                ])
+                ]),
               );
             }
           }
@@ -609,19 +551,20 @@ export const printers: Record<string, Printer<Node>> = {
                 },
                 "value",
                 "body",
-                "body"
+                "body",
               );
               doc.push(
                 b.group([
                   "(",
-                  value.params.length
-                    ? callEmbed(
-                        print,
-                        attrPath,
-                        "params",
-                        getOriginalCodeForList(opts, ",", value.params)
-                      )
-                    : "",
+                  b.indent([
+                    b.softline,
+                    b.join(
+                      [",", b.line],
+                      attrPath.map((it) => print(it), "value", "params"),
+                    ),
+                    opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                  ]),
+                  b.softline,
                   ")",
                 ]),
                 methodBodyDocs.length
@@ -631,14 +574,18 @@ export const printers: Record<string, Printer<Node>> = {
                       b.line,
                       "}",
                     ])
-                  : " {}"
+                  : " {}",
               );
             } else {
               doc.push(
                 node.bound ? ":=" : "=",
                 b.group(
-                  withParensIfNeeded(value, opts, attrPath.call(print, "value"))
-                )
+                  withParensIfNeeded(
+                    value,
+                    attrPath.call(print, "value"),
+                    opts.markoAttrParen,
+                  ),
+                ),
               );
             }
           }
@@ -649,9 +596,12 @@ export const printers: Record<string, Printer<Node>> = {
           return (["..."] as Doc[]).concat(
             withParensIfNeeded(
               node.value,
-              opts,
-              (path as AstPath<types.MarkoSpreadAttribute>).call(print, "value")
-            )
+              (path as AstPath<types.MarkoSpreadAttribute>).call(
+                print,
+                "value",
+              ),
+              opts.markoAttrParen,
+            ),
           );
         }
         case "MarkoPlaceholder":
@@ -672,9 +622,9 @@ export const printers: Record<string, Printer<Node>> = {
                   opts,
                   printSpecialDeclaration(childPath, prefix, opts, print) || [
                     prefix + " ",
-                    withBlockIfNeeded(childNode, opts, childPath.call(print)),
-                  ]
-                )
+                    withBlockIfNeeded(childNode, childPath.call(print)),
+                  ],
+                ),
               );
             }
           }, "body");
@@ -701,127 +651,395 @@ export const printers: Record<string, Printer<Node>> = {
 
           return b.ifBreak(
             asLiteralTextContent(breakValue),
-            asLiteralTextContent(value)
+            asLiteralTextContent(value),
           );
         }
         default:
           throw new Error(`Unknown node type in Marko template: ${node.type}`);
       }
     },
-    embed(path, print, toDoc, opts) {
-      const node = path.getValue();
-      const t = currentCompiler.types;
+    embed(path, opts) {
+      const node = path.getNode() as types.Node;
+      const type = node?.type;
+      const { types: t } = currentCompiler;
 
-      switch (node.type) {
-        case "_MarkoEmbed":
-          switch (node.mode) {
-            case "var": {
-              return tryPrintEmbed(
-                `var ${node.code}=_`,
-                opts.markoScriptParser,
-                (doc: any) => {
-                  const contents = doc[0].contents[1].contents;
-                  for (let i = contents.length; i--; ) {
-                    const item = contents[i];
-                    if (typeof item === "string") {
-                      // Walks back until we find the equals sign.
-                      const match = /\s*=\s*$/.exec(item);
-                      if (match) {
-                        contents[i] = item.slice(0, -match[0].length);
-                        contents.length = i + 1;
-                        break;
+      switch (type) {
+        case "File":
+        case "Program":
+          return null;
+        case "MarkoClass":
+          return (toDoc) =>
+            toDoc(
+              `class ${getOriginalCodeForNode(
+                opts as ParserOptions<types.Node>,
+                node.body,
+              )}`,
+              { parser: expressionParser },
+            );
+        case "MarkoTag":
+          if (node.name.type === "StringLiteral") {
+            switch (node.name.value) {
+              case "script":
+                return async (toDoc, print) => {
+                  const placeholders = [] as Doc[];
+                  const groupId = Symbol();
+                  const doc: Doc[] = [
+                    opts.markoSyntax === "html" ? "<" : "",
+                    "script",
+                  ];
+                  let placeholderId = 0;
+
+                  if (node.var) {
+                    doc.push(
+                      "/",
+                      (
+                        path as AstPath<types.MarkoTag & { var: types.LVal }>
+                      ).call(print, "var"),
+                    );
+                  }
+
+                  if (node.attributes.length) {
+                    const attrsDoc: Doc[] = [];
+
+                    path.each((attrPath) => {
+                      const attrNode = attrPath.getNode() as types.Node;
+                      if ((attrNode as types.MarkoAttribute).default) {
+                        doc.push(print(attrPath));
+                      } else {
+                        attrsDoc.push(print(attrPath));
+                      }
+                    }, "attributes");
+
+                    if (attrsDoc.length) {
+                      if (attrsDoc.length === 1) {
+                        doc.push(" ", attrsDoc[0]);
+                      } else {
+                        doc.push(
+                          b.group([
+                            opts.markoSyntax === "concise"
+                              ? b.ifBreak(" [")
+                              : "",
+                            b.indent([b.line, b.join(b.line, attrsDoc)]),
+                            opts.markoSyntax === "concise"
+                              ? b.ifBreak([b.line, "]"])
+                              : b.ifBreak(b.line),
+                          ]),
+                        );
                       }
                     }
                   }
 
-                  return contents;
-                },
-                node.code
-              );
-            }
-            case "params": {
-              return tryPrintEmbed(
-                toExpression(`(${node.code})=>_`),
-                expressionParser,
-                (doc: any) => {
-                  const { contents } = doc.contents[0];
-                  if (Array.isArray(contents) && contents[0].startsWith("(")) {
-                    contents[0] = contents[0].slice(1);
-                    contents[contents.length - 1] = contents[
-                      contents.length - 1
-                    ].slice(0, -1);
+                  if (node.body.body.length) {
+                    const wrapSep =
+                      opts.markoSyntax === "html" &&
+                      (node.var ||
+                        node.body.params.length ||
+                        node.arguments?.length ||
+                        node.attributes.length ||
+                        node.body.body.some(
+                          (child) => !isTextLike(child, node),
+                        ))
+                        ? b.hardline
+                        : opts.markoSyntax === "concise" ||
+                          node.body.body.some(
+                            (child) => child.type === "MarkoScriptlet",
+                          )
+                        ? b.hardline
+                        : b.softline;
+
+                    if (opts.markoSyntax === "html") {
+                      doc.push(">");
+                    }
+
+                    let embeddedCode = "";
+                    path.each(
+                      (childPath) => {
+                        const childNode = childPath.getNode() as types.Node;
+                        if (childNode.type === "MarkoText") {
+                          embeddedCode += childNode.value;
+                        } else {
+                          embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
+                          placeholders.push(print(childPath));
+                        }
+                      },
+                      "body",
+                      "body",
+                    );
+
+                    const bodyDoc = b.group([
+                      opts.markoSyntax === "html"
+                        ? ""
+                        : b.ifBreak("--", " --", { groupId }),
+                      opts.markoSyntax === "html" ? "" : b.line,
+                      replaceEmbeddedPlaceholders(
+                        await toDoc(embeddedCode, { parser: scriptParser }),
+                        placeholders,
+                      ),
+                      opts.markoSyntax === "html"
+                        ? ""
+                        : b.ifBreak([b.softline, "--"]),
+                    ]);
+
+                    doc.push(b.indent([wrapSep, bodyDoc]));
+
+                    if (opts.markoSyntax === "html") {
+                      doc.push(wrapSep, `</script>`);
+                    }
+                  } else if (opts.markoSyntax === "html") {
+                    doc.push("/>");
                   }
 
-                  return contents;
-                },
-                node.code
-              );
-            }
-            case "script":
-              return tryPrintEmbed(node.code, opts.markoScriptParser);
-            default: {
-              if (!node.mode.startsWith("style.")) {
-                return [b.trim, asLiteralTextContent(node.code)];
+                  return withLineIfNeeded(
+                    node,
+                    opts as any,
+                    b.group(doc, { id: groupId }),
+                  );
+                };
+              case "style": {
+                const rawValue = node.rawValue!;
+                const [startContent, lang] = styleReg.exec(
+                  rawValue || "style",
+                )!;
+                const parser = lang ? getParserNameFromExt(lang) : "css";
+
+                if (startContent.endsWith("{")) {
+                  // style { block }
+                  const codeSartOffset = startContent.length;
+                  const codeEndOffset = node.rawValue!.lastIndexOf("}");
+                  const code = rawValue
+                    .slice(codeSartOffset, codeEndOffset)
+                    .trim();
+
+                  return async (toDoc) => {
+                    try {
+                      return withLineIfNeeded(
+                        node,
+                        opts as any,
+                        b.group([
+                          "style",
+                          !lang || lang === ".css" ? "" : lang,
+                          " {",
+                          b.indent([b.line, await toDoc(code, { parser })]),
+                          b.line,
+                          "}",
+                        ]),
+                      );
+                    } catch {
+                      return withLineIfNeeded(
+                        node,
+                        opts as any,
+                        asLiteralTextContent(rawValue),
+                      );
+                    }
+                  };
+                } else {
+                  return async (toDoc, print) => {
+                    const placeholders = [] as Doc[];
+                    const groupId = Symbol();
+                    const doc: Doc[] = [
+                      opts.markoSyntax === "html" ? "<" : "",
+                      "style",
+                      !lang || lang === ".css" ? "" : lang,
+                    ];
+                    let placeholderId = 0;
+
+                    if (node.var) {
+                      doc.push(
+                        "/",
+                        (
+                          path as AstPath<types.MarkoTag & { var: types.LVal }>
+                        ).call(print, "var"),
+                      );
+                    }
+
+                    if (!lang && node.attributes.length) {
+                      const attrsDoc: Doc[] = [];
+
+                      path.each((attrPath) => {
+                        const attrNode = attrPath.getNode() as types.Node;
+                        if ((attrNode as types.MarkoAttribute).default) {
+                          doc.push(print(attrPath));
+                        } else {
+                          attrsDoc.push(print(attrPath));
+                        }
+                      }, "attributes");
+
+                      if (attrsDoc.length) {
+                        if (attrsDoc.length === 1) {
+                          doc.push(" ", attrsDoc[0]);
+                        } else {
+                          doc.push(
+                            b.group([
+                              opts.markoSyntax === "concise"
+                                ? b.ifBreak(" [")
+                                : "",
+                              b.indent([b.line, b.join(b.line, attrsDoc)]),
+                              opts.markoSyntax === "concise"
+                                ? b.ifBreak([b.line, "]"])
+                                : b.ifBreak(b.line),
+                            ]),
+                          );
+                        }
+                      }
+                    }
+
+                    if (node.body.body.length) {
+                      const wrapSep =
+                        opts.markoSyntax === "html" &&
+                        (node.var ||
+                          node.body.params.length ||
+                          node.arguments?.length ||
+                          node.attributes.length ||
+                          node.body.body.some(
+                            (child) => !isTextLike(child, node),
+                          ))
+                          ? b.hardline
+                          : opts.markoSyntax === "concise" ||
+                            node.body.body.some(
+                              (child) => child.type === "MarkoScriptlet",
+                            )
+                          ? b.hardline
+                          : b.softline;
+
+                      if (opts.markoSyntax === "html") {
+                        doc.push(">");
+                      }
+
+                      let embeddedCode = "";
+                      path.each(
+                        (childPath) => {
+                          const childNode = childPath.getNode() as types.Node;
+                          if (childNode.type === "MarkoText") {
+                            embeddedCode += childNode.value;
+                          } else {
+                            embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
+                            placeholders.push(print(childPath));
+                          }
+                        },
+                        "body",
+                        "body",
+                      );
+
+                      const bodyDoc = b.group([
+                        opts.markoSyntax === "html"
+                          ? ""
+                          : b.ifBreak("--", " --", { groupId }),
+                        opts.markoSyntax === "html" ? "" : b.line,
+                        replaceEmbeddedPlaceholders(
+                          await toDoc(embeddedCode, { parser }),
+                          placeholders,
+                        ),
+                        opts.markoSyntax === "html"
+                          ? ""
+                          : b.ifBreak([b.softline, "--"]),
+                      ]);
+
+                      doc.push(b.indent([wrapSep, bodyDoc]));
+
+                      if (opts.markoSyntax === "html") {
+                        doc.push(wrapSep, `</style>`);
+                      }
+                    } else if (opts.markoSyntax === "html") {
+                      doc.push("/>");
+                    }
+
+                    return withLineIfNeeded(
+                      node,
+                      opts as any,
+                      b.group(doc, { id: groupId }),
+                    );
+                  };
+                }
               }
-
-              return tryPrintEmbed(node.code, node.mode.slice("style.".length));
             }
           }
-
-        case "MarkoClass":
-          return (toDoc as any)(
-            toExpression(`class ${getOriginalCodeForNode(opts, node.body)}`),
-            { parser: expressionParser },
-            { stripTrailingHardline: true }
-          );
-        case "File":
-        case "Program":
-        case "EmptyStatement":
-          return null;
-        case "ExportNamedDeclaration":
-          if (node.declaration) {
-            const printedDeclaration = (
-              path as AstPath<typeof node & { declaration: types.Declaration }>
-            ).call(
-              (childPath) =>
-                printSpecialDeclaration(childPath, "export", opts, print),
-              "declaration"
-            );
-            if (printedDeclaration) return printedDeclaration;
-          }
-          break;
-        default:
-          if (node.type.startsWith("Marko")) {
-            return null;
-          }
       }
 
-      if (t.isStatement(node)) {
-        return tryPrintEmbed(
-          getOriginalCodeForNode(opts, node),
-          opts.markoScriptParser
-        );
-      } else {
-        return tryPrintEmbed(
-          toExpression(getOriginalCodeForNode(opts, node)),
-          expressionParser
-        );
-      }
+      if (type.startsWith("Marko")) return null;
 
-      function tryPrintEmbed(
-        code: string,
-        parser: string | CustomParser,
-        normalize: (doc: Doc) => Doc = identity,
-        fallback: string = code
-      ) {
-        try {
-          return normalize(
-            (toDoc as any)(code, { parser }, { stripTrailingHardline: true })
-          );
-        } catch {
-          return [asLiteralTextContent(fallback)];
+      return async (toDoc, print) => {
+        switch (node.type) {
+          case "EmptyStatement":
+            return undefined;
+          case "ExportNamedDeclaration":
+            if (node.declaration) {
+              const printedDeclaration = (
+                path as AstPath<
+                  typeof node & { declaration: types.Declaration }
+                >
+              ).call(
+                (childPath) =>
+                  printSpecialDeclaration(
+                    childPath,
+                    "export",
+                    opts as ParserOptions<Node>,
+                    print,
+                  ),
+                "declaration",
+              );
+              if (printedDeclaration) return printedDeclaration;
+            }
+            break;
         }
-      }
+
+        const code = getOriginalCodeForNode(
+          opts as ParserOptions<types.Node>,
+          node,
+        );
+
+        if (t.isStatement(node)) {
+          return tryPrintEmbed(code, scriptParser);
+        } else {
+          const parent = path.getParentNode() as types.Node | undefined;
+          const parentType = parent?.type;
+          if (
+            parentType === "MarkoTagBody" ||
+            (parentType === "VariableDeclarator" && path.key === "id") ||
+            (parentType === "MarkoTag" && path.key === "var")
+          ) {
+            return tryPrintEmbed(
+              `var ${code}=_`,
+              scriptParser,
+              (doc: any) => {
+                const contents = doc[0].contents[1].contents;
+                for (let i = contents.length; i--; ) {
+                  const item = contents[i];
+                  if (typeof item === "string") {
+                    // Walks back until we find the equals sign.
+                    const match = /\s*=\s*$/.exec(item);
+                    if (match) {
+                      contents[i] = item.slice(0, -match[0].length);
+                      contents.length = i + 1;
+                      break;
+                    }
+                  }
+                }
+
+                return contents;
+              },
+              code,
+            );
+          }
+
+          return tryPrintEmbed(code, expressionParser);
+        }
+
+        async function tryPrintEmbed(
+          code: string,
+          parser: string,
+          normalize: (doc: Doc) => Doc = identity,
+          fallback: string = code,
+        ) {
+          try {
+            return normalize(await toDoc(code, { parser }));
+          } catch {
+            return [asLiteralTextContent(fallback)];
+          }
+        }
+      };
+    },
+    getVisitorKeys(node) {
+      return (currentCompiler.types as any).VISITOR_KEYS[node.type] || emptyArr;
     },
   },
 };
@@ -835,10 +1053,10 @@ function printSpecialDeclaration(
   path: AstPath<Node>,
   prefix: string,
   opts: ParserOptions<Node>,
-  print: (path: AstPath<Node>) => doc.builders.Doc
+  print: (path: AstPath<Node>) => doc.builders.Doc,
 ) {
-  const node = path.getValue();
-  switch (node.type) {
+  const node = path.getNode();
+  switch (node?.type) {
     case "TSTypeAliasDeclaration":
       return [
         prefix + " type ",
@@ -853,10 +1071,10 @@ function printSpecialDeclaration(
                     (paramsPath) =>
                       b.join(
                         [",", b.line],
-                        paramsPath.map((param) => param.call(print))
+                        paramsPath.map((param) => param.call(print)),
                       ),
                     "typeParameters",
-                    "params"
+                    "params",
                   ),
                 ]),
                 b.softline,
@@ -867,8 +1085,7 @@ function printSpecialDeclaration(
         " = ",
         withParensIfBreak(
           node.typeAnnotation,
-          opts,
-          (path as AstPath<typeof node>).call(print, "typeAnnotation")
+          (path as AstPath<typeof node>).call(print, "typeAnnotation"),
         ),
         opts.semi ? ";" : "",
       ];
@@ -876,35 +1093,28 @@ function printSpecialDeclaration(
       return b.join(
         b.hardline,
         (path as AstPath<typeof node>).map((declPath) => {
-          const decl = declPath.getValue();
-          decl.id;
+          const decl = declPath.getNode()!;
           return [
             prefix + " " + (node.declare ? "declare " : "") + node.kind + " ",
-            callEmbed(
-              print,
-              declPath,
-              "var",
-              getOriginalCodeForNode(opts, decl.id)
-            ),
+            declPath.call(print, "id"),
             decl.init
               ? [
                   " = ",
                   withParensIfBreak(
                     decl.init,
-                    opts,
                     (
                       declPath as AstPath<
                         types.VariableDeclarator & {
                           init: types.Expression;
                         }
                       >
-                    ).call(print, "init")
+                    ).call(print, "init"),
                   ),
                 ]
               : "",
             opts.semi ? ";" : "",
           ];
-        }, "declarations")
+        }, "declarations"),
       );
     }
   }
@@ -948,6 +1158,44 @@ function replaceEmbeddedPlaceholders(doc: Doc, placeholders: Doc[]) {
   });
 }
 
-function toExpression(code: string) {
-  return `(${code}\n)`;
+function getParserNameFromExt(ext: string) {
+  switch (ext) {
+    case ".css":
+      return "css";
+    case ".less":
+      return "less";
+    case ".scss":
+      return "scss";
+    case ".js":
+    case ".mjs":
+    case ".cjs":
+      return "babel";
+    case ".ts":
+    case ".mts":
+    case ".cts":
+      return "babel-ts";
+  }
+}
+
+function preventTrailingCommaTagArgs(tagName: string) {
+  switch (tagName) {
+    case "if":
+    case "else-if":
+    case "while":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function preventTrailingCommaAttrArgs(attrName: string) {
+  switch (attrName) {
+    case "if":
+    case "while":
+    case "no-update-if":
+    case "no-update-body-if":
+      return true;
+    default:
+      return false;
+  }
 }

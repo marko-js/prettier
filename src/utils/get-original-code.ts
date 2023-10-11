@@ -1,10 +1,13 @@
 import { ParserOptions } from "prettier";
-import { Node } from "../constants";
+import type { types as t } from "@marko/compiler";
 import locToPos from "./loc-to-pos";
 import babelGenerator from "@babel/generator";
 const generate = (babelGenerator as any).default || babelGenerator;
 
-export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
+export function getOriginalCodeForNode(
+  opts: ParserOptions<t.Node>,
+  node: t.Node,
+) {
   const loc = node.loc;
   if (!loc) {
     return generate(node as any, {
@@ -39,12 +42,4 @@ export function getOriginalCodeForNode(opts: ParserOptions<Node>, node: Node) {
   }
 
   return opts.originalText.slice(locToPos(start, opts), locToPos(end, opts));
-}
-
-export function getOriginalCodeForList(
-  opts: ParserOptions<Node>,
-  sep: string,
-  list: Node[]
-) {
-  return list.map((node) => getOriginalCodeForNode(opts, node)).join(sep);
 }

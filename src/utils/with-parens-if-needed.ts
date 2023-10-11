@@ -1,26 +1,17 @@
-import { doc, Doc, format, ParserOptions } from "prettier";
-import { Node, enclosedNodeTypeReg } from "../constants";
+import { doc as d, type Doc } from "prettier";
+import type { types as t } from "@marko/compiler";
+import { enclosedNodeTypeReg } from "../constants";
 import outerCodeMatches from "./outer-code-matches";
-import { getOriginalCodeForNode } from "./get-original-code";
+import printDoc from "./print-doc";
 
-const { builders: b } = doc;
+const { builders: b } = d;
 
-export function withParensIfNeeded(node: Node, opts: ParserOptions, doc: Doc) {
+export function withParensIfNeeded(node: t.Node, doc: Doc, enclosed?: boolean) {
   if (
     (node as any).leadingComments?.length ||
     (node as any).trailingComments?.length ||
     (!enclosedNodeTypeReg.test(node.type) &&
-      outerCodeMatches(
-        format(`_(${getOriginalCodeForNode(opts, node)})`, {
-          ...opts,
-          printWidth: 0,
-          parser: opts.markoScriptParser,
-        })
-          .replace(/^_\(([\s\S]*)\);?$/m, "$1")
-          .trim(),
-        /\s|>/y,
-        opts.markoAttrParen
-      ))
+      outerCodeMatches(printDoc(doc).trim(), /\s|>/y, enclosed))
   ) {
     return b.group(["(", b.indent([b.softline, doc]), b.softline, ")"]);
   }
@@ -28,22 +19,12 @@ export function withParensIfNeeded(node: Node, opts: ParserOptions, doc: Doc) {
   return doc;
 }
 
-export function withParensIfBreak(node: Node, opts: ParserOptions, doc: Doc) {
+export function withParensIfBreak(node: t.Node, doc: Doc) {
   if (
     (node as any).leadingComments?.length ||
     (node as any).trailingComments?.length ||
     (!enclosedNodeTypeReg.test(node.type) &&
-      outerCodeMatches(
-        format(`_(${getOriginalCodeForNode(opts, node)})`, {
-          ...opts,
-          printWidth: 0,
-          parser: opts.markoScriptParser,
-        })
-          .replace(/^_\(([\s\S]*)\);?$/m, "$1")
-          .trim(),
-        /\n/y,
-        true
-      ))
+      outerCodeMatches(printDoc(doc).trim(), /\n/y, true))
   ) {
     return b.group([
       b.ifBreak("(", ""),
