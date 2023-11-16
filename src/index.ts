@@ -310,6 +310,54 @@ export const printers: Record<string, Printer<types.Node>> = {
             );
           }
 
+          if (node.typeArguments) {
+            doc.push(
+              b.group([
+                "<",
+                b.indent([
+                  b.softline,
+                  b.join(
+                    [",", b.softline],
+                    node.typeArguments.params.map((param) =>
+                      opts.originalText.substring(
+                        locToPos(param.loc!.start, opts) + 1,
+                        locToPos(param.loc!.end, opts) + 1,
+                      ),
+                    ),
+                  ),
+                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                ]),
+                b.softline,
+                ">",
+              ]),
+            );
+          }
+          if (node.body.typeParameters) {
+            if (!node.typeArguments) {
+              doc.push(" ");
+            }
+            doc.push(
+              b.group([
+                "<",
+                b.indent([
+                  b.softline,
+                  b.join(
+                    [",", b.softline],
+                    node.body.typeParameters.params.map((param) =>
+                      opts.originalText.substring(
+                        locToPos(param.loc!.start, opts) + 1,
+                        locToPos(param.loc!.end, opts) + 1,
+                      ),
+                    ),
+                  ),
+                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
+                ]),
+                b.softline,
+                ">",
+              ]),
+            );
+          }
+
           const shorthandIndex = doc.push("") - 1;
 
           if (node.var) {
