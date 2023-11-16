@@ -317,7 +317,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 b.indent([
                   b.softline,
                   b.join(
-                    [",", b.softline],
+                    [",", b.line],
                     node.typeArguments.params.map((param) =>
                       opts.originalText.substring(
                         locToPos(param.loc!.start, opts) + 1,
@@ -342,7 +342,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 b.indent([
                   b.softline,
                   b.join(
-                    [",", b.softline],
+                    [",", b.line],
                     node.body.typeParameters.params.map((param) =>
                       opts.originalText.substring(
                         locToPos(param.loc!.start, opts) + 1,

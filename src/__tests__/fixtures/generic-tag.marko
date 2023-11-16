@@ -1,8 +1,10 @@
-<my-tag<MyType> my-attr="my-string" />
-<my-tag <MyType>|x| />
+<my-tag<MyType, MyOtherType> my-attr="my-string" />
+<my-tag <MyType, MyOtherType>|x| />
 <my-tag
   <MyType>|x|
   my-attr="my-string"
 />
 <my-tag<MyType>|x|/>
-<my-tag<MyType1><MyType2>|x| />
+<my-tag<MyType1><MyOtherType>|x| />
+<my-tag<A, Whole, Bunch, Of, Tag, Attribute, Types, That, Need, To, Wrap, To, The, Next, Line>
+  <A, Whole, Bunch, Of, Tag, Parameter, Types, That, Need, To, Wrap, To, The, Next, Line>|x| />
