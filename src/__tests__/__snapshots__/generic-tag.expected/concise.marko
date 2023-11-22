@@ -18,7 +18,7 @@ my-tag<
   To,
   The,
   Next,
-  Line,
+  Line
 ><
   A,
   Whole,
@@ -35,4 +35,11 @@ my-tag<
   The,
   Next,
   Line,
+>|x|
+my-tag <
+  T extends
+    keyof (typeof SuperLongImportedVariableName)["member1"]["member2"]["member3"],
+  K extends T extends string
+    ? MyType["member1"]["member2"]["member3"]
+    : MyOtherType,
 >|x|

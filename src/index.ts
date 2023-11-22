@@ -30,6 +30,10 @@ import {
 } from "./utils/with-parens-if-needed";
 import asLiteralTextContent from "./utils/as-literal-text-content";
 import { getOriginalCodeForNode } from "./utils/get-original-code";
+import {
+  TSTypeParameterDeclaration,
+  TSTypeParameterInstantiation,
+} from "@marko/compiler/babel-types";
 type Node = types.Node;
 const defaultFilePath = resolve("index.marko");
 const rootRequire = createRequire(defaultFilePath);
@@ -312,24 +316,13 @@ export const printers: Record<string, Printer<types.Node>> = {
 
           if (node.typeArguments) {
             doc.push(
-              b.group([
-                "<",
-                b.indent([
-                  b.softline,
-                  b.join(
-                    [",", b.line],
-                    node.typeArguments.params.map((param) =>
-                      opts.originalText.substring(
-                        locToPos(param.loc!.start, opts) + 1,
-                        locToPos(param.loc!.end, opts) + 1,
-                      ),
-                    ),
-                  ),
-                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
-                ]),
-                b.softline,
-                ">",
-              ]),
+              (
+                tagPath as AstPath<
+                  types.MarkoTag & {
+                    typeArguments: TSTypeParameterInstantiation;
+                  }
+                >
+              ).call(print, "typeArguments"),
             );
           }
           if (node.body.typeParameters) {
@@ -337,24 +330,15 @@ export const printers: Record<string, Printer<types.Node>> = {
               doc.push(" ");
             }
             doc.push(
-              b.group([
-                "<",
-                b.indent([
-                  b.softline,
-                  b.join(
-                    [",", b.line],
-                    node.body.typeParameters.params.map((param) =>
-                      opts.originalText.substring(
-                        locToPos(param.loc!.start, opts) + 1,
-                        locToPos(param.loc!.end, opts) + 1,
-                      ),
-                    ),
-                  ),
-                  opts.trailingComma === "all" ? b.ifBreak(",") : "",
-                ]),
-                b.softline,
-                ">",
-              ]),
+              (
+                tagPath as AstPath<
+                  types.MarkoTag & {
+                    body: {
+                      typeParameters: TSTypeParameterDeclaration;
+                    };
+                  }
+                >
+              ).call(print, "body", "typeParameters"),
             );
           }
 
@@ -482,13 +466,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                       opts.markoSyntax === "html"
                         ? ""
                         : isFirst
-                        ? b.ifBreak("--", " --", { groupId })
-                        : "--",
+                          ? b.ifBreak("--", " --", { groupId })
+                          : "--",
                       opts.markoSyntax === "html"
                         ? ""
                         : preserveSpace
-                        ? b.hardline
-                        : b.line,
+                          ? b.hardline
+                          : b.line,
                       preserveSpace ? textDocs : b.fill(textDocs),
                       opts.markoSyntax === "html"
                         ? ""
@@ -514,8 +498,8 @@ export const printers: Record<string, Printer<types.Node>> = {
                 node.body.body.some((child) => child.type === "MarkoScriptlet"))
                 ? b.hardline
                 : preserveSpace
-                ? ""
-                : b.softline;
+                  ? ""
+                  : b.softline;
             const wrapSep =
               !preserveSpace &&
               opts.markoSyntax === "html" &&
@@ -789,11 +773,11 @@ export const printers: Record<string, Printer<types.Node>> = {
                         ))
                         ? b.hardline
                         : opts.markoSyntax === "concise" ||
-                          node.body.body.some(
-                            (child) => child.type === "MarkoScriptlet",
-                          )
-                        ? b.hardline
-                        : b.softline;
+                            node.body.body.some(
+                              (child) => child.type === "MarkoScriptlet",
+                            )
+                          ? b.hardline
+                          : b.softline;
 
                     if (opts.markoSyntax === "html") {
                       doc.push(">");
@@ -943,11 +927,11 @@ export const printers: Record<string, Printer<types.Node>> = {
                           ))
                           ? b.hardline
                           : opts.markoSyntax === "concise" ||
-                            node.body.body.some(
-                              (child) => child.type === "MarkoScriptlet",
-                            )
-                          ? b.hardline
-                          : b.softline;
+                              node.body.body.some(
+                                (child) => child.type === "MarkoScriptlet",
+                              )
+                            ? b.hardline
+                            : b.softline;
 
                       if (opts.markoSyntax === "html") {
                         doc.push(">");
@@ -1040,7 +1024,28 @@ export const printers: Record<string, Printer<types.Node>> = {
         } else {
           const parent = path.getParentNode() as types.Node | undefined;
           const parentType = parent?.type;
-          if (
+          if (parentType === "MarkoTag" && path.key === "typeArguments") {
+            return tryPrintEmbed(
+              `_${code}`,
+              scriptParser,
+              (doc: any) => {
+                return doc[1].contents;
+              },
+              code,
+            );
+          } else if (
+            parentType === "MarkoTagBody" &&
+            path.key === "typeParameters"
+          ) {
+            return tryPrintEmbed(
+              `function _${code}() {}`,
+              scriptParser,
+              (doc: any) => {
+                return doc[1].contents;
+              },
+              code,
+            );
+          } else if (
             parentType === "MarkoTagBody" ||
             (parentType === "VariableDeclarator" && path.key === "id") ||
             (parentType === "MarkoTag" && path.key === "var")
