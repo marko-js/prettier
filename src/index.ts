@@ -45,6 +45,20 @@ const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
 let currentCompiler: typeof Compiler;
 let currentConfig: Config;
 
+function getCurrentCompiler(): [typeof Compiler, Config] {
+  try {
+    return [
+      (currentCompiler ||= rootRequire("@marko/compiler")),
+      (currentConfig ||= rootRequire("@marko/compiler/config").default),
+    ];
+  } catch (cause) {
+    throw new Error(
+      "You must have @marko/compiler installed to use prettier-plugin-marko.",
+      { cause },
+    );
+  }
+}
+
 export const languages: SupportLanguage[] = [
   {
     name: "marko",
@@ -113,19 +127,7 @@ export const parsers: Record<string, Parser<Node>> = {
     async parse(text, opts) {
       const { filepath = defaultFilePath } = opts;
 
-      const [{ compile, types: t }, config] = (() => {
-        try {
-          return [
-            (currentCompiler ||= rootRequire("@marko/compiler")),
-            (currentConfig ||= rootRequire("@marko/compiler/config").default),
-          ];
-        } catch (cause) {
-          throw new Error(
-            "You must have @marko/compiler installed to use prettier-plugin-marko.",
-            { cause },
-          );
-        }
-      })() as [typeof Compiler, Config];
+      const [{ compile, types: t }, config] = getCurrentCompiler();
 
       const translator = (() => {
         try {
@@ -693,7 +695,7 @@ export const printers: Record<string, Printer<types.Node>> = {
     embed(path, opts) {
       const node = path.getNode() as types.Node;
       const type = node?.type;
-      const { types: t } = currentCompiler;
+      const [{ types: t }] = getCurrentCompiler();
 
       switch (type) {
         case "File":
@@ -1092,7 +1094,8 @@ export const printers: Record<string, Printer<types.Node>> = {
       };
     },
     getVisitorKeys(node) {
-      return (currentCompiler.types as any).VISITOR_KEYS[node.type] || emptyArr;
+      const [compiler] = getCurrentCompiler();
+      return (compiler.types as any).VISITOR_KEYS[node.type] || emptyArr;
     },
   },
 };
