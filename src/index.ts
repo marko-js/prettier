@@ -45,20 +45,6 @@ const embeddedPlaceholderReg = /__EMBEDDED_PLACEHOLDER_(\d+)__/g;
 let currentCompiler: typeof Compiler;
 let currentConfig: Config;
 
-function getCurrentCompiler(): [typeof Compiler, Config] {
-  try {
-    return [
-      (currentCompiler ||= rootRequire("@marko/compiler")),
-      (currentConfig ||= rootRequire("@marko/compiler/config").default),
-    ];
-  } catch (cause) {
-    throw new Error(
-      "You must have @marko/compiler installed to use prettier-plugin-marko.",
-      { cause },
-    );
-  }
-}
-
 export const languages: SupportLanguage[] = [
   {
     name: "marko",
@@ -125,40 +111,11 @@ export const parsers: Record<string, Parser<Node>> = {
   marko: {
     astFormat: "marko-ast",
     async parse(text, opts) {
+      ensureCompiler();
+
       const { filepath = defaultFilePath } = opts;
-
-      const [{ compile, types: t }, config] = getCurrentCompiler();
-
-      const translator = (() => {
-        try {
-          return rootRequire(config.translator);
-        } catch (err) {
-          throw new Error("Unable to find Marko translator.", { cause: err });
-        }
-      })();
-
-      const { ast } = await compile(`${text}\n`, filepath, {
-        ...config,
-        translator,
-        ast: true,
-        code: false,
-        optimize: false,
-        output: "source",
-        sourceMaps: false,
-        writeVersionComment: false,
-        babelConfig: {
-          caller: { name: "@marko/prettier" },
-          babelrc: false,
-          configFile: false,
-          parserOpts: {
-            allowUndeclaredExports: true,
-            allowAwaitOutsideFunction: true,
-            allowReturnOutsideFunction: true,
-            allowImportExportEverywhere: true,
-            plugins: ["exportDefaultFrom", "importAssertions"],
-          },
-        },
-      });
+      const { compile, types: t } = currentCompiler;
+      const { ast } = await compile(`${text}\n`, filepath, currentConfig);
 
       opts.originalText = text;
       opts.markoLinePositions = [0];
@@ -693,9 +650,11 @@ export const printers: Record<string, Printer<types.Node>> = {
       }
     },
     embed(path, opts) {
+      ensureCompiler();
+
       const node = path.getNode() as types.Node;
       const type = node?.type;
-      const [{ types: t }] = getCurrentCompiler();
+      const { types: t } = currentCompiler;
 
       switch (type) {
         case "File":
@@ -1094,15 +1053,15 @@ export const printers: Record<string, Printer<types.Node>> = {
       };
     },
     getVisitorKeys(node) {
-      const [compiler] = getCurrentCompiler();
-      return (compiler.types as any).VISITOR_KEYS[node.type] || emptyArr;
+      ensureCompiler();
+      return (currentCompiler.types as any).VISITOR_KEYS[node.type] || emptyArr;
     },
   },
 };
 
 export function setCompiler(compiler: typeof Compiler, config: Config) {
   currentCompiler = compiler;
-  currentConfig = config;
+  setConfig(config);
 }
 
 function printSpecialDeclaration(
@@ -1254,4 +1213,55 @@ function preventTrailingCommaAttrArgs(attrName: string) {
     default:
       return false;
   }
+}
+
+function ensureCompiler() {
+  if (!currentConfig) {
+    let config: Config;
+    try {
+      currentCompiler = rootRequire("@marko/compiler");
+      config = rootRequire("@marko/compiler/config").default;
+    } catch (cause) {
+      throw new Error(
+        "You must have @marko/compiler installed to use prettier-plugin-marko.",
+        { cause },
+      );
+    }
+
+    setConfig(config);
+  }
+}
+
+function setConfig(config: Config) {
+  let { translator } = config;
+  if (typeof translator === "string") {
+    try {
+      translator = rootRequire(translator);
+    } catch {
+      // ignore
+    }
+  }
+
+  currentConfig = {
+    ...config,
+    translator,
+    ast: true,
+    code: false,
+    optimize: false,
+    output: "source",
+    sourceMaps: false,
+    writeVersionComment: false,
+    babelConfig: {
+      caller: { name: "@marko/prettier" },
+      babelrc: false,
+      configFile: false,
+      parserOpts: {
+        allowUndeclaredExports: true,
+        allowAwaitOutsideFunction: true,
+        allowReturnOutsideFunction: true,
+        allowImportExportEverywhere: true,
+        plugins: ["exportDefaultFrom", "importAssertions"],
+      },
+    },
+  };
 }
