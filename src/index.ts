@@ -533,40 +533,7 @@ export const printers: Record<string, Printer<types.Node>> = {
               t.isFunctionExpression(value) &&
               !(value.id || value.async || value.generator)
             ) {
-              const methodBodyDocs: Doc[] = [];
-              (attrPath as any).each(
-                (childPath: AstPath<types.Statement>) => {
-                  if (childPath.getNode()?.type !== "EmptyStatement") {
-                    methodBodyDocs.push(print(childPath));
-                  }
-                },
-                "value",
-                "body",
-                "body",
-              );
-              doc.push(
-                b.group([
-                  "(",
-                  b.indent([
-                    b.softline,
-                    b.join(
-                      [",", b.line],
-                      attrPath.map((it) => print(it), "value", "params"),
-                    ),
-                    opts.trailingComma === "all" ? b.ifBreak(",") : "",
-                  ]),
-                  b.softline,
-                  ")",
-                ]),
-                methodBodyDocs.length
-                  ? b.group([
-                      " {",
-                      b.indent([b.line, b.join(b.hardline, methodBodyDocs)]),
-                      b.line,
-                      "}",
-                    ])
-                  : " {}",
-              );
+              doc.push(attrPath.call(print, "value"));
             } else {
               doc.push(
                 node.bound ? ":=" : "=",
@@ -1030,6 +997,20 @@ export const printers: Record<string, Printer<types.Node>> = {
                 }
 
                 return contents;
+              },
+              code,
+            );
+          } else if (
+            parentType === "MarkoAttribute" &&
+            path.key === "value" &&
+            node.type === "FunctionExpression" &&
+            !(node.async || node.generator || node.id)
+          ) {
+            return tryPrintEmbed(
+              `({_${code.replace(/^\s*function\s*/, "")}})`,
+              scriptParser,
+              (doc: any) => {
+                return doc[1].contents[1].contents[1].contents.slice(1);
               },
               code,
             );

@@ -8,6 +8,21 @@ export function getOriginalCodeForNode(
   opts: ParserOptions<t.Node>,
   node: t.Node,
 ) {
+  const hasLeadingComments = node.leadingComments?.length;
+  const hasTrailingComments = node.trailingComments?.length;
+
+  if (!hasLeadingComments && !hasTrailingComments) {
+    switch (node.type) {
+      case "StringLiteral":
+        return JSON.stringify(node.value);
+      case "BooleanLiteral":
+      case "NumericLiteral":
+        return "" + node.value;
+      case "NullLiteral":
+        return "null";
+    }
+  }
+
   const loc = node.loc;
   if (!loc) {
     return generate(node as any, {
@@ -19,8 +34,8 @@ export function getOriginalCodeForNode(
   }
 
   let start = loc.start;
-  if (node.leadingComments?.length) {
-    const commentStart = node.leadingComments[0].loc.start;
+  if (hasLeadingComments) {
+    const commentStart = node.leadingComments![0].loc.start;
     if (
       commentStart.line < start.line ||
       (commentStart.line === start.line && commentStart.column < start.column)
@@ -30,9 +45,9 @@ export function getOriginalCodeForNode(
   }
 
   let end = loc.end;
-  if (node.trailingComments?.length) {
+  if (hasTrailingComments) {
     const commentEnd =
-      node.trailingComments[node.trailingComments.length - 1].loc.end;
+      node.trailingComments![node.trailingComments!.length - 1].loc.end;
     if (
       commentEnd.line > end.line ||
       (commentEnd.line === end.line && commentEnd.column > end.column)
