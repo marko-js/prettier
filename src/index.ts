@@ -402,7 +402,9 @@ export const printers: Record<string, Printer<types.Node>> = {
             if (opts.markoSyntax === "html") doc.push(">");
           } else if (node.body.body.length) {
             const lastIndex = node.body.body.length - 1;
-            const bodyDocs = [] as Doc[];
+            const bodyDocs = Array.isArray((node as any).attributeTags)
+              ? (tagPath as any).map(print, "attributeTags")
+              : [];
             let textOnly = true;
 
             let textDocs = [] as Doc[];
