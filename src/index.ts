@@ -645,6 +645,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 return async (toDoc, print) => {
                   const placeholders = [] as Doc[];
                   const groupId = Symbol();
+                  const parser = getScriptParser(node);
                   const doc: Doc[] = [
                     opts.markoSyntax === "html" ? "<" : "",
                     "script",
@@ -734,11 +735,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                         : b.ifBreak("--", " --", { groupId }),
                       opts.markoSyntax === "html" ? "" : b.line,
                       replaceEmbeddedPlaceholders(
-                        await toDoc(embeddedCode, {
-                          parser: scriptParser,
-                        }).catch(() =>
-                          asLiteralTextContent(embeddedCode.trim()),
-                        ),
+                        parser === false
+                          ? asLiteralTextContent(embeddedCode.trim())
+                          : await toDoc(embeddedCode, {
+                              parser,
+                            }).catch(() =>
+                              asLiteralTextContent(embeddedCode.trim()),
+                            ),
                         placeholders,
                       ),
                       opts.markoSyntax === "html"
@@ -1257,4 +1260,26 @@ function setConfig(config: Config) {
       },
     },
   };
+}
+
+function getScriptParser(tag: types.MarkoTag) {
+  for (const attr of tag.attributes) {
+    if (attr.type === "MarkoAttribute" && attr.name === "type") {
+      switch (
+        attr.value.type === "StringLiteral" ? attr.value.value : undefined
+      ) {
+        case "module":
+        case "text/javascript":
+        case "application/javascript":
+          return scriptParser;
+        case "importmap":
+        case "speculationrules":
+          return "json";
+        default:
+          return false;
+      }
+    }
+  }
+
+  return scriptParser;
 }
