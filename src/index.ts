@@ -734,7 +734,11 @@ export const printers: Record<string, Printer<types.Node>> = {
                         : b.ifBreak("--", " --", { groupId }),
                       opts.markoSyntax === "html" ? "" : b.line,
                       replaceEmbeddedPlaceholders(
-                        await toDoc(embeddedCode, { parser: scriptParser }),
+                        await toDoc(embeddedCode, {
+                          parser: scriptParser,
+                        }).catch(() =>
+                          asLiteralTextContent(embeddedCode.trim()),
+                        ),
                         placeholders,
                       ),
                       opts.markoSyntax === "html"
@@ -781,7 +785,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                           "style",
                           !lang || lang === ".css" ? "" : lang,
                           " {",
-                          b.indent([b.line, await toDoc(code, { parser })]),
+                          b.indent([
+                            b.line,
+                            await toDoc(code, { parser }).catch(() =>
+                              asLiteralTextContent(code.trim()),
+                            ),
+                          ]),
                           b.line,
                           "}",
                         ]),
@@ -888,14 +897,15 @@ export const printers: Record<string, Printer<types.Node>> = {
                           : b.ifBreak("--", " --", { groupId }),
                         opts.markoSyntax === "html" ? "" : b.line,
                         replaceEmbeddedPlaceholders(
-                          await toDoc(embeddedCode, { parser }),
+                          await toDoc(embeddedCode, { parser }).catch(() =>
+                            asLiteralTextContent(embeddedCode.trim()),
+                          ),
                           placeholders,
                         ),
                         opts.markoSyntax === "html"
                           ? ""
                           : b.ifBreak([b.softline, "--"]),
                       ]);
-
                       doc.push(b.indent([wrapSep, bodyDoc]));
 
                       if (opts.markoSyntax === "html") {
