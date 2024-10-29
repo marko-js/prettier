@@ -1274,6 +1274,7 @@ function getScriptParser(tag: types.MarkoTag) {
           return scriptParser;
         case "importmap":
         case "speculationrules":
+        case "application/json":
           return "json";
         default:
           return false;
