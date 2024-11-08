@@ -398,14 +398,16 @@ export const printers: Record<string, Printer<types.Node>> = {
             }
           }
 
+          const hasAttrTags = !!node.attributeTags?.length;
+
           if (voidHTMLReg.test(literalTagName)) {
             if (opts.markoSyntax === "html") doc.push(">");
-          } else if (node.body.body.length) {
+          } else if (node.body.body.length || hasAttrTags) {
             const lastIndex = node.body.body.length - 1;
-            const bodyDocs = Array.isArray((node as any).attributeTags)
+            const bodyDocs = hasAttrTags
               ? (tagPath as any).map(print, "attributeTags")
               : [];
-            let textOnly = true;
+            let textOnly = !hasAttrTags;
 
             let textDocs = [] as Doc[];
             tagPath.each(
@@ -456,6 +458,7 @@ export const printers: Record<string, Printer<types.Node>> = {
             const joinSep =
               (preserveSpace || !textOnly) &&
               (opts.markoSyntax === "concise" ||
+                node.attributeTags?.length ||
                 node.body.body.some((child) => child.type === "MarkoScriptlet"))
                 ? b.hardline
                 : preserveSpace
