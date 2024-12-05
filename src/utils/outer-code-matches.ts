@@ -45,11 +45,11 @@ enclosedPatterns.push(
   },
   {
     // Single quote string
-    match: /'(?:\\.|[^'\\]+)*'/y,
+    match: /'(?:\\.|[^'\\])*'/y,
   },
   {
     // Double quote string
-    match: /"(?:\\.|[^"\\]+)*"/y,
+    match: /"(?:\\.|[^"\\])*"/y,
   },
   {
     // Template literal
