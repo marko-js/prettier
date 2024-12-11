@@ -575,7 +575,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           ];
         case "MarkoScriptlet": {
           const bodyDocs: Doc = [];
-          const prefix = node.static ? "static" : "$";
+          const prefix = node.static ? node.target || "static" : "$";
           path.each((childPath) => {
             const childNode = childPath.getNode() as types.Statement;
             if (childNode && childNode.type !== "EmptyStatement") {
