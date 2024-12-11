@@ -7,7 +7,7 @@ const generate = (babelGenerator as any).default || babelGenerator;
 export function getOriginalCodeForNode(
   opts: ParserOptions<t.Node>,
   node: t.Node,
-) {
+): string {
   const hasLeadingComments = node.leadingComments?.length;
   const hasTrailingComments = node.trailingComments?.length;
 

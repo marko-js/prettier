@@ -5,13 +5,13 @@
   "author": "Dylan Piercey <dpiercey@ebay.com>",
   "bugs": "https://github.com/marko-js/prettier/issues",
   "devDependencies": {
-    "@babel/generator": "^7.26.2",
+    "@babel/generator": "^7.26.3",
     "@commitlint/cli": "^17.7.2",
     "@commitlint/config-conventional": "^17.7.0",
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@types/babel__generator": "^7.6.8",
-    "@types/mocha": "^10.0.7",
-    "@types/node": "^22.5.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^6.7.5",
     "@typescript-eslint/parser": "^6.7.5",
     "esbuild": "^0.24.0",
@@ -22,13 +22,13 @@
     "fixpack": "^4.0.0",
     "husky": "^8.0.3",
     "lint-staged": "^14.0.1",
-    "marko": "^5.35.32",
+    "marko": "^5.36.3",
     "mocha": "^10.7.3",
     "mocha-snap": "^5.0.0",
     "nyc": "^15.1.0",
-    "prettier": "^3.3.3",
+    "prettier": "^3.4.2",
     "semantic-release": "^22.0.5",
-    "typescript": "^5.5.4"
+    "typescript": "^5.7.2"
   },
   "exports": {
     ".": {

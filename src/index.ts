@@ -664,12 +664,32 @@ export const printers: Record<string, Printer<types.Node>> = {
                     );
                   }
 
+                  let bodyOverrideCode: string | undefined;
+
                   if (node.attributes.length) {
                     const attrsDoc: Doc[] = [];
 
                     path.each((attrPath) => {
                       const attrNode = attrPath.getNode() as types.Node;
-                      if ((attrNode as types.MarkoAttribute).default) {
+                      if (
+                        attrNode.type === "MarkoAttribute" &&
+                        attrNode.name === "value" &&
+                        !node.body.body.length &&
+                        attrNode.value.type === "FunctionExpression" &&
+                        !(
+                          attrNode.value.async ||
+                          attrNode.value.generator ||
+                          attrNode.value.returnType ||
+                          attrNode.value.typeParameters
+                        )
+                      ) {
+                        bodyOverrideCode = getOriginalCodeForNode(
+                          opts as ParserOptions<types.Node>,
+                          attrNode.value.body,
+                        )
+                          .replace(/^\s*{\s*/, "")
+                          .replace(/\s*}\s*$/, "");
+                      } else if ((attrNode as types.MarkoAttribute).default) {
                         doc.push(print(attrPath));
                       } else {
                         attrsDoc.push(print(attrPath));
@@ -695,21 +715,29 @@ export const printers: Record<string, Printer<types.Node>> = {
                     }
                   }
 
-                  if (node.body.body.length) {
+                  const bodyOverride =
+                    bodyOverrideCode !== undefined &&
+                    (await toDoc(bodyOverrideCode, {
+                      parser,
+                    }).catch(() => asLiteralTextContent(bodyOverrideCode!)));
+
+                  if (bodyOverride || node.body.body.length) {
                     const wrapSep =
                       opts.markoSyntax === "html" &&
                       (node.var ||
                         node.body.params.length ||
                         node.arguments?.length ||
                         node.attributes.length ||
-                        node.body.body.some(
-                          (child) => !isTextLike(child, node),
-                        ))
+                        (!bodyOverride &&
+                          node.body.body.some(
+                            (child) => !isTextLike(child, node),
+                          )))
                         ? b.hardline
                         : opts.markoSyntax === "concise" ||
-                            node.body.body.some(
-                              (child) => child.type === "MarkoScriptlet",
-                            )
+                            (!bodyOverride &&
+                              node.body.body.some(
+                                (child) => child.type === "MarkoScriptlet",
+                              ))
                           ? b.hardline
                           : b.softline;
 
@@ -718,35 +746,38 @@ export const printers: Record<string, Printer<types.Node>> = {
                     }
 
                     let embeddedCode = "";
-                    path.each(
-                      (childPath) => {
-                        const childNode = childPath.getNode() as types.Node;
-                        if (childNode.type === "MarkoText") {
-                          embeddedCode += childNode.value;
-                        } else {
-                          embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
-                          placeholders.push(print(childPath));
-                        }
-                      },
-                      "body",
-                      "body",
-                    );
+                    if (!bodyOverride) {
+                      path.each(
+                        (childPath) => {
+                          const childNode = childPath.getNode() as types.Node;
+                          if (childNode.type === "MarkoText") {
+                            embeddedCode += childNode.value;
+                          } else {
+                            embeddedCode += `__EMBEDDED_PLACEHOLDER_${placeholderId++}__`;
+                            placeholders.push(print(childPath));
+                          }
+                        },
+                        "body",
+                        "body",
+                      );
+                    }
 
                     const bodyDoc = b.group([
                       opts.markoSyntax === "html"
                         ? ""
                         : b.ifBreak("--", " --", { groupId }),
                       opts.markoSyntax === "html" ? "" : b.line,
-                      replaceEmbeddedPlaceholders(
-                        parser === false
-                          ? asLiteralTextContent(embeddedCode.trim())
-                          : await toDoc(embeddedCode, {
-                              parser,
-                            }).catch(() =>
-                              asLiteralTextContent(embeddedCode.trim()),
-                            ),
-                        placeholders,
-                      ),
+                      bodyOverride ||
+                        replaceEmbeddedPlaceholders(
+                          parser === false
+                            ? asLiteralTextContent(embeddedCode.trim())
+                            : await toDoc(embeddedCode, {
+                                parser,
+                              }).catch(() =>
+                                asLiteralTextContent(embeddedCode.trim()),
+                              ),
+                          placeholders,
+                        ),
                       opts.markoSyntax === "html"
                         ? ""
                         : b.ifBreak([b.softline, "--"]),
