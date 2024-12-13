@@ -675,9 +675,9 @@ export const printers: Record<string, Printer<types.Node>> = {
                         attrNode.type === "MarkoAttribute" &&
                         attrNode.name === "value" &&
                         !node.body.body.length &&
-                        attrNode.value.type === "FunctionExpression" &&
+                        (attrNode.value.type === "FunctionExpression" ||
+                          attrNode.value.type === "ArrowFunctionExpression") &&
                         !(
-                          attrNode.value.async ||
                           attrNode.value.generator ||
                           attrNode.value.returnType ||
                           attrNode.value.typeParameters
