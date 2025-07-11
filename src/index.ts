@@ -385,14 +385,12 @@ export const printers: Record<string, Printer<types.Node>> = {
               if (attrsDoc.length === 1) {
                 doc.push(" ", attrsDoc[0]);
               } else {
+                const attrSep =
+                  opts.markoSyntax === "concise"
+                    ? [b.line, b.ifBreak(",")]
+                    : b.line;
                 doc.push(
-                  b.group([
-                    opts.markoSyntax === "concise" ? b.ifBreak(" [") : "",
-                    b.indent([b.line, b.join(b.line, attrsDoc)]),
-                    opts.markoSyntax === "concise"
-                      ? b.ifBreak([b.line, "]"])
-                      : b.ifBreak(b.line),
-                  ]),
+                  b.group(b.indent([attrSep, b.join(attrSep, attrsDoc)])),
                 );
               }
             }
@@ -700,16 +698,14 @@ export const printers: Record<string, Printer<types.Node>> = {
                       if (attrsDoc.length === 1) {
                         doc.push(" ", attrsDoc[0]);
                       } else {
+                        const attrSep =
+                          opts.markoSyntax === "concise"
+                            ? [b.line, b.ifBreak(",")]
+                            : b.line;
                         doc.push(
-                          b.group([
-                            opts.markoSyntax === "concise"
-                              ? b.ifBreak(" [")
-                              : "",
-                            b.indent([b.line, b.join(b.line, attrsDoc)]),
-                            opts.markoSyntax === "concise"
-                              ? b.ifBreak([b.line, "]"])
-                              : b.ifBreak(b.line),
-                          ]),
+                          b.group(
+                            b.indent([attrSep, b.join(attrSep, attrsDoc)]),
+                          ),
                         );
                       }
                     }
@@ -876,16 +872,14 @@ export const printers: Record<string, Printer<types.Node>> = {
                         if (attrsDoc.length === 1) {
                           doc.push(" ", attrsDoc[0]);
                         } else {
+                          const attrSep =
+                            opts.markoSyntax === "concise"
+                              ? [b.line, b.ifBreak(",")]
+                              : b.line;
                           doc.push(
-                            b.group([
-                              opts.markoSyntax === "concise"
-                                ? b.ifBreak(" [")
-                                : "",
-                              b.indent([b.line, b.join(b.line, attrsDoc)]),
-                              opts.markoSyntax === "concise"
-                                ? b.ifBreak([b.line, "]"])
-                                : b.ifBreak(b.line),
-                            ]),
+                            b.group(
+                              b.indent([attrSep, b.join(attrSep, attrsDoc)]),
+                            ),
                           );
                         }
                       }
