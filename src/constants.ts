@@ -22,7 +22,7 @@ export const enclosedNodeTypeReg =
   /^(?:Identifier|.*Literal|(?:Object|Array|Parenthesized|Record|Tuple)Expression)$/;
 export const styleReg = /^style((?:\.[^\s\\/:*?"<>|({]+)+)?\s*\{?/;
 export const voidHTMLReg =
-  /^(?:area|b(?:ase|r)|col|embed|hr|i(?:mg|nput)|keygen|link|meta|param|source|track|wbr)$/;
+  /^(?:area|b(?:ase|r)|col|embed|hr|i(?:mg|nput)|keygen|link|meta|param|source|track|wbr|const|debug|id|let|lifecycle|log|return)$/;
 export const shorthandIdOrClassReg =
   /^[a-zA-Z0-9_$][a-zA-Z0-9_$-]*(?:\s+[a-zA-Z0-9_$][a-zA-Z0-9_$-]*)*$/;
 export const preserveSpaceTagsReg = /^(?:textarea|pre)$/;
