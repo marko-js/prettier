@@ -1,5 +1,4 @@
-script nonce=$global.cspNonce type="speculationrules"
-  --
+script nonce=$global.cspNonce type="speculationrules" --
   {
     "prerender": [
       {
@@ -8,21 +7,15 @@ script nonce=$global.cspNonce type="speculationrules"
       }
     ]
   }
-  --
 
-script type="application/json"
-  --
+script type="application/json" --
   { "hello": ${JSON.stringify(
     world,
   )}, "and-a-lot-more": "stuff-in-here-to-line-break" }
-  --
-script type="application/json"
-  --
+script type="application/json" --
   {
     "hello": 345873495873985893,
     "and-a-lot-more": "stuff-in-here-to-line-break"
   }
-  --
 
-script type="unknown"
-  -- ${foo}
+script type="unknown" -- ${foo}

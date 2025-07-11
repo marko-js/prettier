@@ -207,12 +207,7 @@ export const printers: Record<string, Printer<types.Node>> = {
             }
 
             if (text.length) {
-              const textDoc = b.group([
-                "--",
-                b.line,
-                b.fill(text),
-                b.ifBreak([b.softline, "--"]),
-              ]);
+              const textDoc = b.group(["--", b.indent([b.line, b.fill(text)])]);
 
               if (isText) {
                 bodyDocs.push(textDoc);
@@ -406,40 +401,31 @@ export const printers: Record<string, Printer<types.Node>> = {
               ? (tagPath as any).map(print, "attributeTags")
               : [];
             let textOnly = !hasAttrTags;
-
             let textDocs = [] as Doc[];
             tagPath.each(
               (childPath, i) => {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node);
+                const isLast = i === lastIndex;
 
                 if (isText) {
                   textDocs.push(print(childPath));
-                  if (i !== lastIndex) return;
+                  if (textOnly || !isLast) return;
                 } else {
                   textOnly = false;
                 }
 
                 if (textDocs.length) {
-                  const isFirst = !bodyDocs.length;
-                  bodyDocs.push(
-                    b.group([
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : isFirst
-                          ? b.ifBreak("--", " --", { groupId })
-                          : "--",
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : preserveSpace
-                          ? b.hardline
-                          : b.line,
-                      preserveSpace ? textDocs : b.fill(textDocs),
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : b.ifBreak([b.softline, "--"]),
-                    ]),
-                  );
+                  const textDocGroup = preserveSpace
+                    ? textDocs
+                    : b.fill(textDocs);
+                  if (opts.markoSyntax === "html") {
+                    bodyDocs.push(textDocGroup);
+                  } else {
+                    bodyDocs.push(
+                      b.group(["--", b.indent([b.line, textDocGroup])]),
+                    );
+                  }
 
                   if (!isText) {
                     textDocs = [];
@@ -453,42 +439,46 @@ export const printers: Record<string, Printer<types.Node>> = {
               "body",
             );
 
-            const joinSep =
-              (preserveSpace || !textOnly) &&
-              (opts.markoSyntax === "concise" ||
-                node.attributeTags?.length ||
-                node.body.body.some((child) => child.type === "MarkoScriptlet"))
-                ? b.hardline
-                : preserveSpace
-                  ? ""
-                  : b.softline;
-            const wrapSep =
-              !preserveSpace &&
-              opts.markoSyntax === "html" &&
-              (node.var ||
-                node.body.params.length ||
-                node.arguments?.length ||
-                node.attributes.length ||
-                node.body.body.some((child) => !isTextLike(child, node)))
-                ? b.hardline
-                : joinSep;
-
             if (opts.markoSyntax === "html") {
-              doc.push(">");
-            }
-
-            if (joinSep || wrapSep) {
-              doc.push(b.indent([wrapSep, b.join(joinSep, bodyDocs)]));
-
-              if (opts.markoSyntax === "html") {
-                doc.push(wrapSep);
-              }
+              const joinSep = preserveSpace
+                ? ""
+                : textOnly
+                  ? b.softline
+                  : b.hardline;
+              const wrapSep =
+                !preserveSpace &&
+                (node.var ||
+                  node.body.params.length ||
+                  node.arguments?.length ||
+                  node.attributes.length ||
+                  node.body.body.some((child) => !isTextLike(child, node)))
+                  ? b.hardline
+                  : joinSep;
+              doc.push(
+                ">",
+                b.indent([
+                  wrapSep,
+                  textOnly ? b.group(textDocs) : b.join(joinSep, bodyDocs),
+                ]),
+                wrapSep,
+                `</${literalTagName}>`,
+              );
             } else {
-              doc.push(...bodyDocs);
-            }
-
-            if (opts.markoSyntax === "html") {
-              doc.push(`</${literalTagName}>`);
+              if (textOnly) {
+                if (node.attributes.length) {
+                  doc.push(
+                    b.indent([
+                      b.line,
+                      "--",
+                      b.group(b.indent([b.line, textDocs])),
+                    ]),
+                  );
+                } else {
+                  doc.push(b.group([" --", b.indent([b.line, textDocs])]));
+                }
+              } else {
+                doc.push(b.indent([b.hardline, b.join(b.hardline, bodyDocs)]));
+              }
             }
           } else if (opts.markoSyntax === "html") {
             doc.push("/>");
@@ -718,29 +708,6 @@ export const printers: Record<string, Printer<types.Node>> = {
                     }).catch(() => asLiteralTextContent(bodyOverrideCode!)));
 
                   if (bodyOverride || node.body.body.length) {
-                    const wrapSep =
-                      opts.markoSyntax === "html" &&
-                      (node.var ||
-                        node.body.params.length ||
-                        node.arguments?.length ||
-                        node.attributes.length ||
-                        (!bodyOverride &&
-                          node.body.body.some(
-                            (child) => !isTextLike(child, node),
-                          )))
-                        ? b.hardline
-                        : opts.markoSyntax === "concise" ||
-                            (!bodyOverride &&
-                              node.body.body.some(
-                                (child) => child.type === "MarkoScriptlet",
-                              ))
-                          ? b.hardline
-                          : b.softline;
-
-                    if (opts.markoSyntax === "html") {
-                      doc.push(">");
-                    }
-
                     let embeddedCode = "";
                     if (!bodyOverride) {
                       path.each(
@@ -758,31 +725,41 @@ export const printers: Record<string, Printer<types.Node>> = {
                       );
                     }
 
-                    const bodyDoc = b.group([
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : b.ifBreak("--", " --", { groupId }),
-                      opts.markoSyntax === "html" ? "" : b.line,
+                    const bodyDoc: Doc =
                       bodyOverride ||
-                        replaceEmbeddedPlaceholders(
-                          parser === false
-                            ? asLiteralTextContent(embeddedCode.trim())
-                            : await toDoc(embeddedCode, {
-                                parser,
-                              }).catch(() =>
-                                asLiteralTextContent(embeddedCode.trim()),
-                              ),
-                          placeholders,
-                        ),
-                      opts.markoSyntax === "html"
-                        ? ""
-                        : b.ifBreak([b.softline, "--"]),
-                    ]);
-
-                    doc.push(b.indent([wrapSep, bodyDoc]));
+                      replaceEmbeddedPlaceholders(
+                        !parser
+                          ? asLiteralTextContent(embeddedCode.trim())
+                          : await toDoc(embeddedCode, {
+                              parser,
+                            }).catch(() =>
+                              asLiteralTextContent(embeddedCode.trim()),
+                            ),
+                        placeholders,
+                      );
 
                     if (opts.markoSyntax === "html") {
-                      doc.push(wrapSep, `</script>`);
+                      const wrapSep =
+                        node.var ||
+                        node.body.params.length ||
+                        node.arguments?.length ||
+                        node.attributes.length ||
+                        (!bodyOverride &&
+                          node.body.body.some(
+                            (child) =>
+                              !isTextLike(child, node) ||
+                              child.type === "MarkoScriptlet",
+                          ))
+                          ? b.hardline
+                          : b.softline;
+                      doc.push(
+                        ">",
+                        b.indent([wrapSep, bodyDoc]),
+                        wrapSep,
+                        `</script>`,
+                      );
+                    } else {
+                      doc.push(b.group([" --", b.indent([b.line, bodyDoc])]));
                     }
                   } else if (opts.markoSyntax === "html") {
                     doc.push("/>");
@@ -886,27 +863,6 @@ export const printers: Record<string, Printer<types.Node>> = {
                     }
 
                     if (node.body.body.length) {
-                      const wrapSep =
-                        opts.markoSyntax === "html" &&
-                        (node.var ||
-                          node.body.params.length ||
-                          node.arguments?.length ||
-                          node.attributes.length ||
-                          node.body.body.some(
-                            (child) => !isTextLike(child, node),
-                          ))
-                          ? b.hardline
-                          : opts.markoSyntax === "concise" ||
-                              node.body.body.some(
-                                (child) => child.type === "MarkoScriptlet",
-                              )
-                            ? b.hardline
-                            : b.softline;
-
-                      if (opts.markoSyntax === "html") {
-                        doc.push(">");
-                      }
-
                       let embeddedCode = "";
                       path.each(
                         (childPath) => {
@@ -922,25 +878,33 @@ export const printers: Record<string, Printer<types.Node>> = {
                         "body",
                       );
 
-                      const bodyDoc = b.group([
-                        opts.markoSyntax === "html"
-                          ? ""
-                          : b.ifBreak("--", " --", { groupId }),
-                        opts.markoSyntax === "html" ? "" : b.line,
-                        replaceEmbeddedPlaceholders(
-                          await toDoc(embeddedCode, { parser }).catch(() =>
-                            asLiteralTextContent(embeddedCode.trim()),
-                          ),
-                          placeholders,
-                        ),
-                        opts.markoSyntax === "html"
-                          ? ""
-                          : b.ifBreak([b.softline, "--"]),
-                      ]);
-                      doc.push(b.indent([wrapSep, bodyDoc]));
+                      const bodyDoc: Doc = replaceEmbeddedPlaceholders(
+                        !parser
+                          ? asLiteralTextContent(embeddedCode.trim())
+                          : await toDoc(embeddedCode, {
+                              parser,
+                            }).catch(() =>
+                              asLiteralTextContent(embeddedCode.trim()),
+                            ),
+                        placeholders,
+                      );
 
                       if (opts.markoSyntax === "html") {
-                        doc.push(wrapSep, `</style>`);
+                        const wrapSep =
+                          node.var ||
+                          node.body.params.length ||
+                          node.arguments?.length ||
+                          node.attributes.length
+                            ? b.hardline
+                            : b.softline;
+                        doc.push(
+                          ">",
+                          b.indent([wrapSep, bodyDoc]),
+                          wrapSep,
+                          `</style>`,
+                        );
+                      } else {
+                        doc.push(b.group([" --", b.indent([b.line, bodyDoc])]));
                       }
                     } else if (opts.markoSyntax === "html") {
                       doc.push("/>");
