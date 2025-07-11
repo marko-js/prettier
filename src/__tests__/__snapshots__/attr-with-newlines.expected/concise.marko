@@ -14,8 +14,8 @@ div data-current-text=(
     .replace("{current_page}", "{item_number}")
 )
 
-div [
-  class=(
+div
+  ,class=(
     [
       "test-class",
       input.mobile && input.thing !== false && "test-class-thing",
@@ -24,10 +24,9 @@ div [
       .filter((className) => className)
       .join(" ")
   )
-  data-current-text=(
+  ,data-current-text=(
     current &&
     current
       .replace("{page_number}", "{item_number}")
       .replace("{current_page}", "{item_number}")
   )
-]
