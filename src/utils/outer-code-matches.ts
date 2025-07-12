@@ -27,19 +27,19 @@ enclosedPatterns.push(
   },
   {
     // Parens
-    match: /\(/y,
+    match: /\s*\(/y,
     patterns: enclosedPatterns,
     until: /\)/y,
   },
   {
     // Braces
-    match: /{/y,
+    match: /\s*{/y,
     patterns: enclosedPatterns,
     until: /}/y,
   },
   {
     // Brackets
-    match: /\[/y,
+    match: /\s*\[/y,
     patterns: enclosedPatterns,
     until: /]/y,
   },
@@ -77,12 +77,13 @@ enclosedPatterns.push(
 const unenclosedPatterns: Pattern[] = [
   {
     // Word operators
-    match: /(?<=\b)\s*(?:as|in(?:stanceof)?|new|void|delete|keyof|typeof)\s+/y,
+    match:
+      /\b\s*(?:as|async|await|class|function|in(?:stanceof)?|new|void|delete|keyof|typeof|satisfies|extends)(?:\s+|\b)/y,
   },
   {
     // Symbol operators
     match:
-      /\s*(?:[\^~%!]|\+{1,2}|\*{1,2}|-(?:-(?!\s))?|&{1,2}|\|{1,2}|!={0,2}|===?|<{2,3}|>{2,3}|<=?|>=)\s*/y,
+      /\s*(?:[\^~%!]|\+{1,2}|\*{1,2}|-(?:-(?!\s))?|&{1,2}|\|{1,2}|!={0,2}|===?|<{1,3}|>{2,3}|<=?|=>)\s*/y,
   },
 ].concat(enclosedPatterns);
 
