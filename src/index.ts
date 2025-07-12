@@ -924,6 +924,23 @@ export const printers: Record<string, Printer<types.Node>> = {
 
       if (type.startsWith("Marko")) return null;
 
+      let parent = path.parent;
+      if (parent.type !== "Program") {
+        let parentIndex = 0;
+        while (
+          !(
+            parent.type === "ExportNamedDeclaration" ||
+            parent.type.startsWith("Marko")
+          )
+        ) {
+          // If we're on a node thats under a marko node, or the special
+          // cased ExportNamedDeclaration, then it will already be printed externally
+          // and doesn't need to be marked as external multiple times.
+          parent = path.getParentNode(++parentIndex);
+          if (!parent) return null;
+        }
+      }
+
       return async (toDoc, print) => {
         switch (node.type) {
           case "EmptyStatement":
