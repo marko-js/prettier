@@ -16,6 +16,10 @@ export function withParensIfNeeded(node: t.Node, doc: Doc, enclosed?: boolean) {
     return b.group(["(", b.indent([b.softline, doc]), b.softline, ")"]);
   }
 
+  if (node.type === "LogicalExpression") {
+    return withParensIfBreak(node, doc);
+  }
+
   return doc;
 }
 
