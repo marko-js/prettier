@@ -964,7 +964,10 @@ export const printers: Record<string, Printer<types.Node>> = {
               `_${code}`,
               scriptParser,
               (doc: any) => {
-                return doc[1].contents;
+                const last = doc.length - 1;
+                doc[0] = doc[0].replace(/^_/, "");
+                doc[last] = doc[last].replace(/;$/, "");
+                return doc;
               },
               code,
             );
@@ -976,7 +979,7 @@ export const printers: Record<string, Printer<types.Node>> = {
               `function _${code}() {}`,
               scriptParser,
               (doc: any) => {
-                return doc[1].contents;
+                return doc[1];
               },
               code,
             );
