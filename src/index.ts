@@ -21,7 +21,7 @@ import {
   expressionParser,
 } from "./constants";
 import locToPos from "./utils/loc-to-pos";
-import isTextLike from "./utils/is-text-like";
+import isTextLike, { getCommentType } from "./utils/is-text-like";
 import withLineIfNeeded from "./utils/with-line-if-needed";
 import withBlockIfNeeded from "./utils/with-block-if-needed";
 import {
@@ -199,7 +199,7 @@ export const printers: Record<string, Printer<types.Node>> = {
 
           path.each((child, i) => {
             const childNode = child.getNode()!;
-            const isText = isTextLike(childNode, node);
+            const isText = isTextLike(childNode, node, opts);
 
             if (isText) {
               text.push(print(child));
@@ -213,7 +213,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 bodyDocs.push(textDoc);
               } else {
                 text = [];
-                bodyDocs.push(textDoc, b.hardline, print(child));
+                bodyDocs.push(textDoc, print(child));
               }
             } else {
               bodyDocs.push(print(child));
@@ -227,13 +227,9 @@ export const printers: Record<string, Printer<types.Node>> = {
         case "MarkoDeclaration":
           return asLiteralTextContent(`<?${node.value}?>`);
         case "MarkoComment": {
-          const start = node.loc?.start;
-          switch (
-            start != null &&
-            opts.originalText[locToPos(start, opts) + 1]
-          ) {
+          switch (getCommentType(node, opts)) {
             case "/":
-              return [asLiteralTextContent(`//${node.value}`), b.hardline];
+              return asLiteralTextContent(`//${node.value}`);
             case "*":
               return asLiteralTextContent(`/*${node.value}*/`);
             default:
@@ -405,7 +401,7 @@ export const printers: Record<string, Printer<types.Node>> = {
             tagPath.each(
               (childPath, i) => {
                 const childNode = childPath.getNode()!;
-                const isText = isTextLike(childNode, node);
+                const isText = isTextLike(childNode, node, opts);
                 const isLast = i === lastIndex;
 
                 if (isText) {
@@ -451,7 +447,9 @@ export const printers: Record<string, Printer<types.Node>> = {
                   node.body.params.length ||
                   node.arguments?.length ||
                   node.attributes.length ||
-                  node.body.body.some((child) => !isTextLike(child, node)))
+                  node.body.body.some(
+                    (child) => !isTextLike(child, node, opts),
+                  ))
                   ? b.hardline
                   : joinSep;
               doc.push(
@@ -747,7 +745,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                         (!bodyOverride &&
                           node.body.body.some(
                             (child) =>
-                              !isTextLike(child, node) ||
+                              !isTextLike(child, node, opts as any) ||
                               child.type === "MarkoScriptlet",
                           ))
                           ? b.hardline
