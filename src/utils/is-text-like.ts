@@ -6,7 +6,7 @@ export default function isTextLike(
   node: t.Node,
   parent: t.MarkoTag | t.Program,
   opts: ParserOptions<t.Node>,
-): boolean {
+): node is t.MarkoText | t.MarkoPlaceholder | t.MarkoComment {
   if (isText(node)) {
     return true;
   } else if (isInlineComment(node, opts)) {

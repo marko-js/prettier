@@ -207,7 +207,10 @@ export const printers: Record<string, Printer<types.Node>> = {
             }
 
             if (text.length) {
-              const textDoc = b.group(["--", b.indent([b.line, b.fill(text)])]);
+              const textDoc = b.group([
+                printDashes(node),
+                b.indent([b.line, b.fill(text)]),
+              ]);
 
               if (isText) {
                 bodyDocs.push(textDoc);
@@ -419,7 +422,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                     bodyDocs.push(textDocGroup);
                   } else {
                     bodyDocs.push(
-                      b.group(["--", b.indent([b.line, textDocGroup])]),
+                      b.group([
+                        printDashes(node),
+                        preserveSpace
+                          ? textDocGroup
+                          : b.indent([b.line, textDocGroup]),
+                      ]),
                     );
                   }
 
@@ -467,11 +475,19 @@ export const printers: Record<string, Printer<types.Node>> = {
                   doc.push(
                     b.indent([
                       b.line,
-                      b.group(["--", b.indent([b.line, textDocs])]),
+                      b.group([
+                        printDashes(node),
+                        preserveSpace ? textDocs : b.indent([b.line, textDocs]),
+                      ]),
                     ]),
                   );
                 } else {
-                  doc.push(b.group([" --", b.indent([b.line, textDocs])]));
+                  doc.push(
+                    b.group([
+                      " " + printDashes(node),
+                      preserveSpace ? textDocs : b.indent([b.line, textDocs]),
+                    ]),
+                  );
                 }
               } else {
                 doc.push(b.indent([b.hardline, b.join(b.hardline, bodyDocs)]));
@@ -581,6 +597,19 @@ export const printers: Record<string, Printer<types.Node>> = {
         case "MarkoText": {
           const parent = getTextParent(path);
           let { value } = node;
+          const dashMatch =
+            opts.markoSyntax === "concise" && /---*/.exec(value);
+          if (dashMatch) {
+            minDashLookup.set(
+              parent,
+              Math.max(minDashLookup.get(parent) || 0, dashMatch[0].length),
+            );
+          }
+
+          if (opts.markoPreservingSpace) {
+            return asLiteralTextContent(value);
+          }
+
           const last = value.length - 1;
           if (
             value[0] === " " &&
@@ -741,8 +770,8 @@ export const printers: Record<string, Printer<types.Node>> = {
                         (!bodyOverride &&
                           node.body.body.some(
                             (child) =>
-                              !isTextLike(child, node, opts as any) ||
-                              child.type === "MarkoScriptlet",
+                              child.type === "MarkoScriptlet" ||
+                              !isTextLike(child, node, opts as any),
                           ))
                           ? b.hardline
                           : b.softline;
@@ -753,7 +782,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                         `</script>`,
                       );
                     } else {
-                      doc.push(b.group([" --", b.indent([b.line, bodyDoc])]));
+                      doc.push(
+                        b.group([
+                          " " + printDashes(node),
+                          b.indent([b.line, bodyDoc]),
+                        ]),
+                      );
                     }
                   } else if (opts.markoSyntax === "html") {
                     doc.push("/>");
@@ -898,7 +932,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                           `</style>`,
                         );
                       } else {
-                        doc.push(b.group([" --", b.indent([b.line, bodyDoc])]));
+                        doc.push(
+                          b.group([
+                            " " + printDashes(node),
+                            b.indent([b.line, bodyDoc]),
+                          ]),
+                        );
                       }
                     } else if (opts.markoSyntax === "html") {
                       doc.push("/>");
@@ -1296,4 +1335,15 @@ function getTextParent(text: AstPath<Compiler.types.Node>) {
   return parent.type === "Program"
     ? parent
     : (text.getParentNode(1) as Compiler.types.MarkoTag);
+}
+
+const minDashLookup = new WeakMap<
+  Compiler.types.Program | Compiler.types.MarkoTag,
+  number
+>();
+function printDashes(parent: Compiler.types.Program | Compiler.types.MarkoTag) {
+  const dashes = minDashLookup.get(parent);
+  if (dashes === undefined) return "--";
+  minDashLookup.delete(parent);
+  return "-".repeat(dashes + 1);
 }
