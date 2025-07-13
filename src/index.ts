@@ -467,8 +467,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                   doc.push(
                     b.indent([
                       b.line,
-                      "--",
-                      b.group(b.indent([b.line, textDocs])),
+                      b.group(["--", b.indent([b.line, textDocs])]),
                     ]),
                   );
                 } else {
@@ -580,28 +579,25 @@ export const printers: Record<string, Printer<types.Node>> = {
           return b.join(b.hardline, bodyDocs);
         }
         case "MarkoText": {
-          const quote = opts.singleQuote ? "'" : '"';
-          const escapedSpace = `\${${quote} ${quote}}`;
-          const { value } = node;
+          const parent = getTextParent(path);
+          let { value } = node;
+          const last = value.length - 1;
+          if (
+            value[0] === " " &&
+            !(path.previous && isTextLike(path.previous, parent, opts))
+          ) {
+            value = (opts.singleQuote ? "${' '}" : '${" "}') + value.slice(1);
+          }
 
           if (
-            value === " " &&
-            (opts.markoSyntax === "concise" ||
-              path.getParentNode()!.type === "Program")
+            value[last] === " " &&
+            !(path.next && isTextLike(path.next, parent, opts))
           ) {
-            return escapedSpace;
+            value =
+              value.slice(0, last) + (opts.singleQuote ? "${' '}" : '${" "}');
           }
 
-          const breakValue = value.replace(/^ | $/g, escapedSpace);
-
-          if (breakValue === value) {
-            return asLiteralTextContent(value);
-          }
-
-          return b.ifBreak(
-            asLiteralTextContent(breakValue),
-            asLiteralTextContent(value),
-          );
+          return asLiteralTextContent(value);
         }
         default:
           throw new Error(`Unknown node type in Marko template: ${node.type}`);
@@ -1293,4 +1289,11 @@ function getScriptParser(tag: types.MarkoTag) {
   }
 
   return scriptParser;
+}
+
+function getTextParent(text: AstPath<Compiler.types.Node>) {
+  const parent = text.parent!;
+  return parent.type === "Program"
+    ? parent
+    : (text.getParentNode(1) as Compiler.types.MarkoTag);
 }
