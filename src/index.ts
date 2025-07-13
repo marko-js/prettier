@@ -610,7 +610,6 @@ export const printers: Record<string, Printer<types.Node>> = {
             return asLiteralTextContent(value);
           }
 
-          const last = value.length - 1;
           if (
             value[0] === " " &&
             !(path.previous && isTextLike(path.previous, parent, opts))
@@ -618,6 +617,7 @@ export const printers: Record<string, Printer<types.Node>> = {
             value = (opts.singleQuote ? "${' '}" : '${" "}') + value.slice(1);
           }
 
+          const last = value.length - 1;
           if (
             value[last] === " " &&
             !(path.next && isTextLike(path.next, parent, opts))
