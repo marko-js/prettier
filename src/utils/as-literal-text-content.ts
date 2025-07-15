@@ -35,3 +35,23 @@ export default function asLiteralTextContent(val: string): Doc {
     return val;
   }
 }
+
+export function asFilledTextContent(val: string): Doc {
+  const parts = val.split(/\s+/);
+  const len = parts.length;
+  switch (len) {
+    case 0:
+      return "";
+    case 1:
+      return asLiteralTextContent(parts[0]);
+  }
+
+  const doc: Doc[] = [];
+  const last = len - 1;
+  for (let i = 0; i < last; i++) {
+    doc.push(asLiteralTextContent(parts[i]), b.line);
+  }
+
+  doc.push(asLiteralTextContent(parts[last]));
+  return b.fill(doc);
+}
