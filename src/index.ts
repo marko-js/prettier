@@ -408,7 +408,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                 const isLast = i === lastIndex;
 
                 if (isText) {
-                  textDocs.push(print(childPath));
+                  if (preserveSpace && opts.markoSyntax === "concise") {
+                    bodyDocs.push(
+                      b.group([printDashes(node), " ", print(childPath)]),
+                    );
+                  } else {
+                    textDocs.push(print(childPath));
+                  }
                   if (textOnly || !isLast) return;
                 } else {
                   textOnly = false;
@@ -420,13 +426,14 @@ export const printers: Record<string, Printer<types.Node>> = {
                     : b.fill(textDocs);
                   if (opts.markoSyntax === "html") {
                     bodyDocs.push(textDocGroup);
-                  } else {
+                  } else if (!preserveSpace) {
+                    const dashes = printDashes(node);
                     bodyDocs.push(
                       b.group([
-                        printDashes(node),
-                        preserveSpace
-                          ? textDocGroup
-                          : b.indent([b.line, textDocGroup]),
+                        dashes,
+                        b.line,
+                        textDocGroup,
+                        b.ifBreak([b.line, dashes]),
                       ]),
                     );
                   }
@@ -470,14 +477,14 @@ export const printers: Record<string, Printer<types.Node>> = {
                 `</${literalTagName}>`,
               );
             } else {
-              if (textOnly) {
+              if (!preserveSpace && textOnly) {
                 if (node.attributes.length) {
                   doc.push(
                     b.indent([
                       b.line,
                       b.group([
                         printDashes(node),
-                        preserveSpace ? textDocs : b.indent([b.line, textDocs]),
+                        b.indent([b.line, textDocs]),
                       ]),
                     ]),
                   );
@@ -485,12 +492,18 @@ export const printers: Record<string, Printer<types.Node>> = {
                   doc.push(
                     b.group([
                       " " + printDashes(node),
-                      preserveSpace ? textDocs : b.indent([b.line, textDocs]),
+                      b.indent([b.line, textDocs]),
                     ]),
                   );
                 }
               } else {
-                doc.push(b.indent([b.hardline, b.join(b.hardline, bodyDocs)]));
+                if (textOnly && bodyDocs.length === 1) {
+                  doc.push(" ", bodyDocs);
+                } else {
+                  doc.push(
+                    b.indent([b.hardline, b.join(b.hardline, bodyDocs)]),
+                  );
+                }
               }
             }
           } else if (opts.markoSyntax === "html") {
@@ -598,16 +611,16 @@ export const printers: Record<string, Printer<types.Node>> = {
           const parent = getTextParent(path);
           let { value } = node;
           const isConcise = opts.markoSyntax === "concise";
+          if (isConcise && opts.markoPreservingSpace) {
+            return toPlaceholder(value, opts.singleQuote);
+          }
+
           const dashMatch = isConcise && /---*/.exec(value);
           if (dashMatch) {
             minDashLookup.set(
               parent,
               Math.max(minDashLookup.get(parent) || 0, dashMatch[0].length),
             );
-          }
-
-          if (isConcise) {
-            value = value.replace(/\s*\n$/, "");
           }
 
           if (opts.markoPreservingSpace) {
@@ -1350,4 +1363,23 @@ function printDashes(parent: Compiler.types.Program | Compiler.types.MarkoTag) {
   if (dashes === undefined) return "--";
   minDashLookup.delete(parent);
   return "-".repeat(dashes + 1);
+}
+
+function toPlaceholder(str: string, singleQuote: boolean) {
+  const quote = str.includes("\n") ? "`" : singleQuote ? "'" : '"';
+  let escaped = str.replace(/\\/g, "\\\\");
+
+  switch (quote) {
+    case "`":
+      escaped = escaped.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+      break;
+    case "'":
+      escaped = escaped.replace(/'/g, "\\'");
+      break;
+    default:
+      escaped = escaped.replace(/"/g, '\\"');
+      break;
+  }
+
+  return "${" + quote + escaped + quote + "}";
 }
