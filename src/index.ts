@@ -28,7 +28,9 @@ import {
   withParensIfNeeded,
   withParensIfBreak,
 } from "./utils/with-parens-if-needed";
-import asLiteralTextContent from "./utils/as-literal-text-content";
+import asLiteralTextContent, {
+  asFilledTextContent,
+} from "./utils/as-literal-text-content";
 import { getOriginalCodeForNode } from "./utils/get-original-code";
 import {
   TSTypeParameterDeclaration,
@@ -421,18 +423,15 @@ export const printers: Record<string, Printer<types.Node>> = {
                 }
 
                 if (textDocs.length) {
-                  const textDocGroup = preserveSpace
-                    ? textDocs
-                    : b.fill(textDocs);
                   if (opts.markoSyntax === "html") {
-                    bodyDocs.push(textDocGroup);
+                    bodyDocs.push(textDocs);
                   } else if (!preserveSpace) {
                     const dashes = printDashes(node);
                     bodyDocs.push(
                       b.group([
                         dashes,
                         b.line,
-                        textDocGroup,
+                        textDocs,
                         b.ifBreak([b.line, dashes]),
                       ]),
                     );
@@ -627,11 +626,15 @@ export const printers: Record<string, Printer<types.Node>> = {
             return asLiteralTextContent(value);
           }
 
+          let prefix = "";
+          let suffix = "";
+
           if (
             value[0] === " " &&
             !(path.previous && isTextLike(path.previous, parent, opts))
           ) {
-            value = (opts.singleQuote ? "${' '}" : '${" "}') + value.slice(1);
+            prefix = opts.singleQuote ? "${' '}" : '${" "}';
+            value = value.slice(1);
           }
 
           const last = value.length - 1;
@@ -639,11 +642,11 @@ export const printers: Record<string, Printer<types.Node>> = {
             value[last] === " " &&
             !(path.next && isTextLike(path.next, parent, opts))
           ) {
-            value =
-              value.slice(0, last) + (opts.singleQuote ? "${' '}" : '${" "}');
+            suffix = opts.singleQuote ? "${' '}" : '${" "}';
+            value = value.slice(0, last);
           }
 
-          return asLiteralTextContent(value);
+          return [prefix, asFilledTextContent(value), suffix];
         }
         default:
           throw new Error(`Unknown node type in Marko template: ${node.type}`);
