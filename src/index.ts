@@ -597,13 +597,17 @@ export const printers: Record<string, Printer<types.Node>> = {
         case "MarkoText": {
           const parent = getTextParent(path);
           let { value } = node;
-          const dashMatch =
-            opts.markoSyntax === "concise" && /---*/.exec(value);
+          const isConcise = opts.markoSyntax === "concise";
+          const dashMatch = isConcise && /---*/.exec(value);
           if (dashMatch) {
             minDashLookup.set(
               parent,
               Math.max(minDashLookup.get(parent) || 0, dashMatch[0].length),
             );
+          }
+
+          if (isConcise) {
+            value = value.replace(/\s*\n$/, "");
           }
 
           if (opts.markoPreservingSpace) {
