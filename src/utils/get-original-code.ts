@@ -1,4 +1,4 @@
-import { ParserOptions } from "prettier";
+import { AstPath, ParserOptions } from "prettier";
 import type { types as t } from "@marko/compiler";
 import locToPos from "./loc-to-pos";
 import babelGenerator from "@babel/generator";
@@ -7,8 +7,11 @@ const generate = (babelGenerator as any).default || babelGenerator;
 export function getOriginalCodeForNode(
   opts: ParserOptions<t.Node>,
   node: t.Node,
+  path?: AstPath<t.Node>,
 ): string {
-  const hasLeadingComments = node.leadingComments?.length;
+  const hasLeadingComments =
+    node.leadingComments?.length &&
+    !(path && path.getParentNode()?.type === "MarkoScriptlet" && !path.isFirst);
   const hasTrailingComments = node.trailingComments?.length;
 
   if (!hasLeadingComments && !hasTrailingComments) {
