@@ -5,13 +5,16 @@ let temp: Doc[] = [""];
 /**
  * Normalizes newlines and backslashes to work in a printed document.
  */
-export default function asLiteralTextContent(val: string): Doc {
+export default function asLiteralTextContent(
+  val: string,
+  escapeBackslashes = false,
+): Doc {
   let charPos = 0;
   let slotPos = 0;
 
   for (let i = 0, len = val.length; i < len; i++) {
     switch (val.charAt(i)) {
-      case "\\":
+      case escapeBackslashes && "\\":
         temp.push("\\\\");
         break;
       case "\n":
@@ -43,15 +46,15 @@ export function asFilledTextContent(val: string): Doc {
     case 0:
       return "";
     case 1:
-      return asLiteralTextContent(parts[0]);
+      return asLiteralTextContent(parts[0], true);
   }
 
   const doc: Doc[] = [];
   const last = len - 1;
   for (let i = 0; i < last; i++) {
-    doc.push(asLiteralTextContent(parts[i]), b.line);
+    doc.push(asLiteralTextContent(parts[i], true), b.line);
   }
 
-  doc.push(asLiteralTextContent(parts[last]));
+  doc.push(asLiteralTextContent(parts[last], true));
   return b.fill(doc);
 }
