@@ -588,11 +588,11 @@ export const printers: Record<string, Printer<types.Node>> = {
           ];
         case "MarkoScriptlet": {
           const prefix = node.static ? node.target || "static" : "$";
-          if (node.body.length <= 1) {
+          if (node.body.filter((child) => !isEmpty(child)).length <= 1) {
             let bodyDoc: Doc = [];
             path.each((childPath) => {
               const childNode = childPath.getNode() as types.Statement;
-              if (childNode)
+              if (childNode && !isEmpty(childNode))
                 bodyDoc = withLineIfNeeded(
                   childNode,
                   opts,
@@ -1434,4 +1434,12 @@ function toPlaceholder(str: string, singleQuote: boolean) {
   }
 
   return "${" + quote + escaped + quote + "}";
+}
+
+function isEmpty(node: Compiler.types.Statement) {
+  return (
+    node.type === "EmptyStatement" &&
+    !node.leadingComments &&
+    !node.trailingComments
+  );
 }
