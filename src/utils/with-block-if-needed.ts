@@ -8,10 +8,8 @@ const { builders: b } = d;
 
 export default function withBlockIfNeeded(node: t.Statement, doc: Doc) {
   if (
-    (!enclosedNodeTypeReg.test(node.type) &&
-      outerCodeMatches(printDoc(doc).trim(), /[\n\r]/y)) ||
-    node.leadingComments ||
-    node.trailingComments
+    !enclosedNodeTypeReg.test(node.type) &&
+    outerCodeMatches(printDoc(doc).trim(), /[\n\r]/y)
   ) {
     return b.group([
       b.indent([b.ifBreak(["{", b.line]), doc]),
