@@ -587,24 +587,43 @@ export const printers: Record<string, Printer<types.Node>> = {
             "}",
           ];
         case "MarkoScriptlet": {
-          const bodyDocs: Doc = [];
           const prefix = node.static ? node.target || "static" : "$";
-          path.each((childPath) => {
-            const childNode = childPath.getNode() as types.Statement;
-            if (childNode && childNode.type !== "EmptyStatement") {
-              bodyDocs.push(
-                withLineIfNeeded(
+          if (node.body.filter((child) => !isEmpty(child)).length <= 1) {
+            let bodyDoc: Doc = [];
+            path.each((childPath) => {
+              const childNode = childPath.getNode() as types.Statement;
+              if (childNode && !isEmpty(childNode)) {
+                bodyDoc = withLineIfNeeded(
                   childNode,
                   opts,
                   printSpecialDeclaration(childPath, prefix, opts, print) || [
                     prefix + " ",
                     withBlockIfNeeded(childNode, childPath.call(print)),
                   ],
+                );
+              }
+            }, "body");
+            return bodyDoc;
+          } else {
+            return [
+              prefix,
+              " {",
+              b.indent([
+                b.hardline,
+                b.join(
+                  b.hardline,
+                  path.map((childPath) => {
+                    if (childPath.node.type !== "EmptyStatement") {
+                      return childPath.call(print);
+                    }
+                    return [];
+                  }, "body"),
                 ),
-              );
-            }
-          }, "body");
-          return b.join(b.hardline, bodyDocs);
+              ]),
+              b.hardline,
+              "}",
+            ];
+          }
         }
         case "MarkoText": {
           const parent = getTextParent(path);
@@ -1022,6 +1041,7 @@ export const printers: Record<string, Printer<types.Node>> = {
         const code = getOriginalCodeForNode(
           opts as ParserOptions<types.Node>,
           node,
+          path,
         );
 
         if (t.isStatement(node)) {
@@ -1166,6 +1186,9 @@ function printSpecialDeclaration(
         opts.semi ? ";" : "",
       ];
     case "VariableDeclaration": {
+      if (path.node.leadingComments || path.node.trailingComments) {
+        break;
+      }
       return b.join(
         b.hardline,
         (path as AstPath<typeof node>).map((declPath) => {
@@ -1193,7 +1216,34 @@ function printSpecialDeclaration(
         }, "declarations"),
       );
     }
+    case "EmptyStatement": {
+      if (node.trailingComments) {
+        if (node.trailingComments.length > 1) {
+          return b.join(b.hardline, [
+            b.indent(
+              b.join(b.hardline, [
+                prefix + " {",
+                ...printComments(node.trailingComments),
+              ]),
+            ),
+            "}",
+          ]);
+        } else {
+          return prefix + " " + printComments(node.trailingComments)[0];
+        }
+      } else {
+        return [];
+      }
+    }
   }
+}
+
+function printComments(comments: readonly Compiler.types.Comment[]) {
+  return comments.map((comment) =>
+    comment.type === "CommentBlock"
+      ? `/*${comment.value}*/`
+      : "//" + comment.value,
+  );
 }
 
 function replaceEmbeddedPlaceholders(doc: Doc, placeholders: Doc[]) {
@@ -1385,4 +1435,12 @@ function toPlaceholder(str: string, singleQuote: boolean) {
   }
 
   return "${" + quote + escaped + quote + "}";
+}
+
+function isEmpty(node: Compiler.types.Statement) {
+  return (
+    node.type === "EmptyStatement" &&
+    !node.leadingComments &&
+    !node.trailingComments
+  );
 }

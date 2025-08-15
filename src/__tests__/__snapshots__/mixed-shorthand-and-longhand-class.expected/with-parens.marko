@@ -1,21 +1,21 @@
-<div class="string blue"/>
-<div class=["blue", "string_list"]/>
+<div class=`${"string"} ${"blue"}`/>
+<div class=["string_list", "blue"]/>
 
 <div class=["templatestring", `${blue}`]/>
-<div class=[`${blue}`, "templatestring_list"]/>
+<div class=["templatestring_list", `${blue}`]/>
 
 <div class=["dynamic", blue]/>
-<div class=[blue, "dynamic_list"]/>
+<div class=["dynamic_list", blue]/>
 
-<div class=["red", blue, "green", yellow, "mixed_list"]/>
+<div class=["mixed_list", "red", blue, "green", yellow]/>
 <div class=[
+  "long_list",
   red,
   yellow,
   (() => "blue")(),
   orange,
   ...colorList.map((item) => item.color),
   green,
-  "long_list",
 ]/>
 <div class=[
   "long_item",
@@ -24,8 +24,8 @@
     .map((color) => color.toUpperCase()),
 ]/>
 
-<div class=["red", "multiple"] class="blue"/>
-<div class="multiple red" class=["blue"]/>
+<div class=["multiple", "red"] class="blue"/>
+<div class=`${"multiple"} ${"red"}` class=["blue"]/>
 
 <div class=[
   "multiple",
