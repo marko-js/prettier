@@ -11,7 +11,7 @@ export default function withLineIfNeeded(
   doc: Doc,
 ) {
   const { originalText } = opts;
-  let pos = locToPos(node.loc!.start, opts);
+  let pos = node.loc ? locToPos(node.loc.start, opts) : 0;
   let count = 0;
 
   while (--pos >= 0) {

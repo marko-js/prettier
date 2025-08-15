@@ -592,7 +592,7 @@ export const printers: Record<string, Printer<types.Node>> = {
             let bodyDoc: Doc = [];
             path.each((childPath) => {
               const childNode = childPath.getNode() as types.Statement;
-              if (childNode && !isEmpty(childNode))
+              if (childNode && !isEmpty(childNode)) {
                 bodyDoc = withLineIfNeeded(
                   childNode,
                   opts,
@@ -601,6 +601,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                     withBlockIfNeeded(childNode, childPath.call(print)),
                   ],
                 );
+              }
             }, "body");
             return bodyDoc;
           } else {
