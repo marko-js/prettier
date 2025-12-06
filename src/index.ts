@@ -32,7 +32,7 @@ import asLiteralTextContent, {
   asFilledTextContent,
 } from "./utils/as-literal-text-content";
 import { getOriginalCodeForNode } from "./utils/get-original-code";
-import printDoc from "./utils/print-doc";
+import printText from "./utils/print-text";
 import {
   TSTypeParameterDeclaration,
   TSTypeParameterInstantiation,
@@ -488,7 +488,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                   ) {
                     docs.push(b.hardline);
                   } else if (type === "MarkoTag" && lastType === "TextGroup") {
-                    const text = printDoc(lastDoc!);
+                    const text = printText(lastDoc!);
                     if (text.endsWith(" ") && /\S/.test(text)) {
                       docs.push(b.softline);
                     }
