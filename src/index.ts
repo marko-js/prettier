@@ -32,6 +32,7 @@ import asLiteralTextContent, {
   asFilledTextContent,
 } from "./utils/as-literal-text-content";
 import { getOriginalCodeForNode } from "./utils/get-original-code";
+import printDoc from "./utils/print-doc";
 import {
   TSTypeParameterDeclaration,
   TSTypeParameterInstantiation,
@@ -397,52 +398,54 @@ export const printers: Record<string, Printer<types.Node>> = {
           if (voidHTMLReg.test(literalTagName)) {
             if (opts.markoSyntax === "html") doc.push(">");
           } else if (node.body.body.length || hasAttrTags) {
-            const lastIndex = node.body.body.length - 1;
-            const bodyDocs = hasAttrTags
-              ? (tagPath as any).map(print, "attributeTags")
+            const bodyItems: [string, Doc][] = hasAttrTags
+              ? tagPath
+                  .map(print, "attributeTags")
+                  .map((doc) => ["MarkoAttrTag", doc])
               : [];
             let textOnly = !hasAttrTags;
             let textDocs = [] as Doc[];
             tagPath.each(
-              (childPath, i) => {
+              (childPath) => {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node, opts);
-                const isLast = i === lastIndex;
 
                 if (isText) {
                   if (preserveSpace && opts.markoSyntax === "concise") {
-                    bodyDocs.push(
+                    bodyItems.push([
+                      childNode.type,
                       b.group([printDashes(node), " ", print(childPath)]),
-                    );
+                    ]);
                   } else {
                     textDocs.push(print(childPath));
                   }
-                  if (textOnly || !isLast) return;
+                  if (textOnly || !childPath.isLast) return;
                 } else {
                   textOnly = false;
                 }
 
                 if (textDocs.length) {
                   if (opts.markoSyntax === "html") {
-                    bodyDocs.push(textDocs);
+                    bodyItems.push(["TextGroup", textDocs]);
                   } else if (!preserveSpace) {
                     const dashes = printDashes(node);
-                    bodyDocs.push(
+                    bodyItems.push([
+                      "TextGroup",
                       b.group([
                         dashes,
                         b.line,
                         textDocs,
                         b.ifBreak([b.line, dashes]),
                       ]),
-                    );
+                    ]);
                   }
 
                   if (!isText) {
                     textDocs = [];
-                    bodyDocs.push(print(childPath));
+                    bodyItems.push([childNode.type, print(childPath)]);
                   }
                 } else {
-                  bodyDocs.push(print(childPath));
+                  bodyItems.push([childNode.type, print(childPath)]);
                 }
               },
               "body",
@@ -466,12 +469,41 @@ export const printers: Record<string, Printer<types.Node>> = {
                   ))
                   ? b.hardline
                   : joinSep;
+
+              let contents: Doc;
+              if (textOnly) {
+                contents = b.group(textDocs);
+              } else {
+                const docs: Doc[] = [];
+                let lastType: string | undefined;
+                let lastDoc: Doc | undefined;
+                for (const [type, doc] of bodyItems) {
+                  if (
+                    lastType &&
+                    (type === "MarkoScriptlet" ||
+                      lastType === "MarkoScriptlet" ||
+                      lastType === "MarkoComment" ||
+                      lastType === "MarkoAttrTag" ||
+                      (type === "MarkoTag" && lastType === "MarkoTag"))
+                  ) {
+                    docs.push(b.hardline);
+                  } else if (type === "MarkoTag" && lastType === "TextGroup") {
+                    const text = printDoc(lastDoc!);
+                    if (text.endsWith(" ") && /\S/.test(text)) {
+                      docs.push(b.softline);
+                    }
+                  }
+
+                  docs.push(doc);
+                  lastType = type;
+                  lastDoc = doc;
+                }
+                contents = b.fill(docs);
+              }
+
               doc.push(
                 ">",
-                b.indent([
-                  wrapSep,
-                  textOnly ? b.group(textDocs) : b.join(joinSep, bodyDocs),
-                ]),
+                b.indent([wrapSep, contents]),
                 wrapSep,
                 `</${literalTagName}>`,
               );
@@ -496,6 +528,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                   );
                 }
               } else {
+                const bodyDocs = bodyItems.map(([, doc]) => doc);
                 if (textOnly && bodyDocs.length === 1) {
                   doc.push(" ", bodyDocs);
                 } else {
@@ -650,7 +683,8 @@ export const printers: Record<string, Printer<types.Node>> = {
 
           if (
             value[0] === " " &&
-            !(path.previous && isTextLike(path.previous, parent, opts))
+            !(path.previous && isTextLike(path.previous, parent, opts)) &&
+            (isConcise || path.isFirst)
           ) {
             prefix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(1);
@@ -659,7 +693,8 @@ export const printers: Record<string, Printer<types.Node>> = {
           const last = value.length - 1;
           if (
             value[last] === " " &&
-            !(path.next && isTextLike(path.next, parent, opts))
+            !(path.next && isTextLike(path.next, parent, opts)) &&
+            (isConcise || path.isLast)
           ) {
             suffix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(0, last);
@@ -847,10 +882,10 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                 if (startContent.endsWith("{")) {
                   // style { block }
-                  const codeSartOffset = startContent.length;
+                  const codeStartOffset = startContent.length;
                   const codeEndOffset = node.rawValue!.lastIndexOf("}");
                   const code = rawValue
-                    .slice(codeSartOffset, codeEndOffset)
+                    .slice(codeStartOffset, codeEndOffset)
                     .trim();
 
                   return async (toDoc) => {
