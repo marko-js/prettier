@@ -66,7 +66,7 @@ npm exec -- prettier --write "**/*.marko"
 ## Yarn
 
 ```console
-yarn prettier  --write "**/*.marko"
+yarn prettier --write "**/*.marko"
 ```
 
 ## Editors
