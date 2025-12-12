@@ -32,7 +32,6 @@ import asLiteralTextContent, {
   asFilledTextContent,
 } from "./utils/as-literal-text-content";
 import { getOriginalCodeForNode } from "./utils/get-original-code";
-import printText from "./utils/print-text";
 import {
   TSTypeParameterDeclaration,
   TSTypeParameterInstantiation,
@@ -398,24 +397,53 @@ export const printers: Record<string, Printer<types.Node>> = {
           if (voidHTMLReg.test(literalTagName)) {
             if (opts.markoSyntax === "html") doc.push(">");
           } else if (node.body.body.length || hasAttrTags) {
-            const bodyItems: [string, Doc][] = hasAttrTags
-              ? tagPath
-                  .map(print, "attributeTags")
-                  .map((doc) => ["MarkoAttrTag", doc])
-              : [];
+            const bodyDocs: Doc[] = [];
+            if (hasAttrTags) {
+              tagPath.each((attrTag) => {
+                bodyDocs.push(print(attrTag));
+                if (opts.markoSyntax === "html") {
+                  bodyDocs.push(b.hardline);
+                }
+              }, "attributeTags");
+              if (
+                !tagPath.node.body.body.length &&
+                opts.markoSyntax === "html"
+              ) {
+                bodyDocs.pop();
+              }
+            }
             let textOnly = !hasAttrTags;
             let textDocs = [] as Doc[];
+            let leadingLine = false;
             tagPath.each(
               (childPath) => {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node, opts);
 
+                if (opts.markoSyntax === "html") {
+                  const { type } = childNode;
+                  const prevType = childPath.previous?.type;
+                  if (
+                    prevType === "MarkoScriptlet" ||
+                    (prevType === "MarkoComment" &&
+                      getCommentType(childPath.previous!, opts) === "/") ||
+                    (type === "MarkoTag" && prevType === "MarkoTag")
+                  ) {
+                    textDocs.push(b.hardline);
+                  } else if (
+                    type === "MarkoTag" &&
+                    prevType === "MarkoText" &&
+                    /\S\s+$/.test(childPath.previous!.value)
+                  ) {
+                    leadingLine = true;
+                  }
+                }
+
                 if (isText) {
                   if (preserveSpace && opts.markoSyntax === "concise") {
-                    bodyItems.push([
-                      childNode.type,
+                    bodyDocs.push(
                       b.group([printDashes(node), " ", print(childPath)]),
-                    ]);
+                    );
                   } else {
                     textDocs.push(print(childPath));
                   }
@@ -426,26 +454,29 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                 if (textDocs.length) {
                   if (opts.markoSyntax === "html") {
-                    bodyItems.push(["TextGroup", textDocs]);
+                    bodyDocs.push(textDocs);
                   } else if (!preserveSpace) {
                     const dashes = printDashes(node);
-                    bodyItems.push([
-                      "TextGroup",
+                    bodyDocs.push(
                       b.group([
                         dashes,
                         b.line,
                         textDocs,
                         b.ifBreak([b.line, dashes]),
                       ]),
-                    ]);
+                    );
                   }
 
                   if (!isText) {
+                    if (leadingLine) {
+                      bodyDocs.push(b.softline);
+                    }
                     textDocs = [];
-                    bodyItems.push([childNode.type, print(childPath)]);
+                    leadingLine = false;
+                    bodyDocs.push(print(childPath));
                   }
                 } else {
-                  bodyItems.push([childNode.type, print(childPath)]);
+                  bodyDocs.push(print(childPath));
                 }
               },
               "body",
@@ -470,40 +501,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                   ? b.hardline
                   : joinSep;
 
-              let contents: Doc;
-              if (textOnly) {
-                contents = b.group(textDocs);
-              } else {
-                const docs: Doc[] = [];
-                let lastType: string | undefined;
-                let lastDoc: Doc | undefined;
-                for (const [type, doc] of bodyItems) {
-                  if (
-                    lastType &&
-                    (type === "MarkoScriptlet" ||
-                      lastType === "MarkoScriptlet" ||
-                      lastType === "MarkoComment" ||
-                      lastType === "MarkoAttrTag" ||
-                      (type === "MarkoTag" && lastType === "MarkoTag"))
-                  ) {
-                    docs.push(b.hardline);
-                  } else if (type === "MarkoTag" && lastType === "TextGroup") {
-                    const text = printText(lastDoc!);
-                    if (text.endsWith(" ") && /\S/.test(text)) {
-                      docs.push(b.softline);
-                    }
-                  }
-
-                  docs.push(doc);
-                  lastType = type;
-                  lastDoc = doc;
-                }
-                contents = b.fill(docs);
-              }
-
               doc.push(
                 ">",
-                b.indent([wrapSep, contents]),
+                b.indent([
+                  wrapSep,
+                  textOnly ? b.group(textDocs) : b.fill(bodyDocs),
+                ]),
                 wrapSep,
                 `</${literalTagName}>`,
               );
@@ -528,7 +531,6 @@ export const printers: Record<string, Printer<types.Node>> = {
                   );
                 }
               } else {
-                const bodyDocs = bodyItems.map(([, doc]) => doc);
                 if (textOnly && bodyDocs.length === 1) {
                   doc.push(" ", bodyDocs);
                 } else {
