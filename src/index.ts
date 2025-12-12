@@ -686,7 +686,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           if (
             value[0] === " " &&
             !(path.previous && isTextLike(path.previous, parent, opts)) &&
-            (isConcise || path.isFirst)
+            (isConcise || path.parent?.type === "Program" || path.isFirst)
           ) {
             prefix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(1);
@@ -696,7 +696,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           if (
             value[last] === " " &&
             !(path.next && isTextLike(path.next, parent, opts)) &&
-            (isConcise || path.isLast)
+            (isConcise || path.parent?.type === "Program" || path.isLast)
           ) {
             suffix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(0, last);
