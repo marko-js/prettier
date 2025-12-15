@@ -420,7 +420,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node, opts);
 
-                if (opts.markoSyntax === "html") {
+                if (opts.markoSyntax === "html" && !preserveSpace) {
                   const { type } = childNode;
                   const prevType = childPath.previous?.type;
                   if (
