@@ -492,13 +492,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                   : b.hardline;
               const wrapSep =
                 !preserveSpace &&
-                (node.var ||
-                  node.body.params.length ||
-                  node.arguments?.length ||
-                  node.attributes.length ||
-                  node.body.body.some(
-                    (child) => !isTextLike(child, node, opts),
-                  ))
+                node.body.body.some((child) => !isTextLike(child, node, opts))
                   ? b.hardline
                   : joinSep;
 
@@ -840,16 +834,12 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                     if (opts.markoSyntax === "html") {
                       const wrapSep =
-                        node.var ||
-                        node.body.params.length ||
-                        node.arguments?.length ||
-                        node.attributes.length ||
-                        (!bodyOverride &&
-                          node.body.body.some(
-                            (child) =>
-                              child.type === "MarkoScriptlet" ||
-                              !isTextLike(child, node, opts as any),
-                          ))
+                        !bodyOverride &&
+                        node.body.body.some(
+                          (child) =>
+                            child.type === "MarkoScriptlet" ||
+                            !isTextLike(child, node, opts as any),
+                        )
                           ? b.hardline
                           : b.softline;
                       doc.push(
