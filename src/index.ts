@@ -468,12 +468,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                   }
 
                   if (!isText) {
-                    if (leadingLine) {
-                      bodyDocs.push(b.softline);
-                    }
                     textDocs = [];
+                    bodyDocs.push(
+                      leadingLine
+                        ? b.group([b.softline, print(childPath)])
+                        : print(childPath),
+                    );
                     leadingLine = false;
-                    bodyDocs.push(print(childPath));
                   }
                 } else {
                   bodyDocs.push(print(childPath));
