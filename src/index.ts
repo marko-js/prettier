@@ -397,17 +397,47 @@ export const printers: Record<string, Printer<types.Node>> = {
           if (voidHTMLReg.test(literalTagName)) {
             if (opts.markoSyntax === "html") doc.push(">");
           } else if (node.body.body.length || hasAttrTags) {
-            const lastIndex = node.body.body.length - 1;
-            const bodyDocs = hasAttrTags
-              ? (tagPath as any).map(print, "attributeTags")
-              : [];
+            const bodyDocs: Doc[] = [];
+            if (hasAttrTags) {
+              tagPath.each((attrTag) => {
+                bodyDocs.push(print(attrTag));
+                if (opts.markoSyntax === "html") {
+                  bodyDocs.push(b.hardline);
+                }
+              }, "attributeTags");
+              if (
+                !tagPath.node.body.body.length &&
+                opts.markoSyntax === "html"
+              ) {
+                bodyDocs.pop();
+              }
+            }
             let textOnly = !hasAttrTags;
             let textDocs = [] as Doc[];
+            let leadingLine = false;
             tagPath.each(
-              (childPath, i) => {
+              (childPath) => {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node, opts);
-                const isLast = i === lastIndex;
+
+                if (opts.markoSyntax === "html") {
+                  const { type } = childNode;
+                  const prevType = childPath.previous?.type;
+                  if (
+                    prevType === "MarkoScriptlet" ||
+                    (prevType === "MarkoComment" &&
+                      getCommentType(childPath.previous!, opts) === "/") ||
+                    (type === "MarkoTag" && prevType === "MarkoTag")
+                  ) {
+                    textDocs.push(b.hardline);
+                  } else if (
+                    type === "MarkoTag" &&
+                    prevType === "MarkoText" &&
+                    /\S\s+$/.test(childPath.previous!.value)
+                  ) {
+                    leadingLine = true;
+                  }
+                }
 
                 if (isText) {
                   if (preserveSpace && opts.markoSyntax === "concise") {
@@ -417,7 +447,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                   } else {
                     textDocs.push(print(childPath));
                   }
-                  if (textOnly || !isLast) return;
+                  if (textOnly || !childPath.isLast) return;
                 } else {
                   textOnly = false;
                 }
@@ -438,7 +468,11 @@ export const printers: Record<string, Printer<types.Node>> = {
                   }
 
                   if (!isText) {
+                    if (leadingLine) {
+                      bodyDocs.push(b.softline);
+                    }
                     textDocs = [];
+                    leadingLine = false;
                     bodyDocs.push(print(childPath));
                   }
                 } else {
@@ -466,11 +500,12 @@ export const printers: Record<string, Printer<types.Node>> = {
                   ))
                   ? b.hardline
                   : joinSep;
+
               doc.push(
                 ">",
                 b.indent([
                   wrapSep,
-                  textOnly ? b.group(textDocs) : b.join(joinSep, bodyDocs),
+                  textOnly ? b.group(textDocs) : b.fill(bodyDocs),
                 ]),
                 wrapSep,
                 `</${literalTagName}>`,
@@ -650,7 +685,8 @@ export const printers: Record<string, Printer<types.Node>> = {
 
           if (
             value[0] === " " &&
-            !(path.previous && isTextLike(path.previous, parent, opts))
+            !(path.previous && isTextLike(path.previous, parent, opts)) &&
+            (isConcise || path.parent?.type === "Program" || path.isFirst)
           ) {
             prefix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(1);
@@ -659,7 +695,8 @@ export const printers: Record<string, Printer<types.Node>> = {
           const last = value.length - 1;
           if (
             value[last] === " " &&
-            !(path.next && isTextLike(path.next, parent, opts))
+            !(path.next && isTextLike(path.next, parent, opts)) &&
+            (isConcise || path.parent?.type === "Program" || path.isLast)
           ) {
             suffix = opts.singleQuote ? "${' '}" : '${" "}';
             value = value.slice(0, last);
@@ -847,10 +884,10 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                 if (startContent.endsWith("{")) {
                   // style { block }
-                  const codeSartOffset = startContent.length;
+                  const codeStartOffset = startContent.length;
                   const codeEndOffset = node.rawValue!.lastIndexOf("}");
                   const code = rawValue
-                    .slice(codeSartOffset, codeEndOffset)
+                    .slice(codeStartOffset, codeEndOffset)
                     .trim();
 
                   return async (toDoc) => {
