@@ -492,7 +492,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                   : b.hardline;
               const wrapSep =
                 !preserveSpace &&
-                node.body.body.some((child) => !isTextLike(child, node, opts))
+                (node.body.body.some(
+                  (child) => !isTextLike(child, node, opts),
+                ) ||
+                  (node.loc &&
+                    opts.originalText[locToPos(node.loc.start, opts)] === "<" &&
+                    node.body.body[0]?.loc &&
+                    node.loc.start.line < node.body.body[0].loc.start.line))
                   ? b.hardline
                   : joinSep;
 
