@@ -420,7 +420,7 @@ export const printers: Record<string, Printer<types.Node>> = {
                 const childNode = childPath.getNode()!;
                 const isText = isTextLike(childNode, node, opts);
 
-                if (opts.markoSyntax === "html") {
+                if (opts.markoSyntax === "html" && !preserveSpace) {
                   const { type } = childNode;
                   const prevType = childPath.previous?.type;
                   if (
@@ -468,12 +468,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                   }
 
                   if (!isText) {
-                    if (leadingLine) {
-                      bodyDocs.push(b.softline);
-                    }
                     textDocs = [];
+                    bodyDocs.push(
+                      leadingLine
+                        ? b.group([b.softline, print(childPath)])
+                        : print(childPath),
+                    );
                     leadingLine = false;
-                    bodyDocs.push(print(childPath));
                   }
                 } else {
                   bodyDocs.push(print(childPath));
@@ -491,13 +492,13 @@ export const printers: Record<string, Printer<types.Node>> = {
                   : b.hardline;
               const wrapSep =
                 !preserveSpace &&
-                (node.var ||
-                  node.body.params.length ||
-                  node.arguments?.length ||
-                  node.attributes.length ||
-                  node.body.body.some(
-                    (child) => !isTextLike(child, node, opts),
-                  ))
+                (node.body.body.some(
+                  (child) => !isTextLike(child, node, opts),
+                ) ||
+                  (node.loc &&
+                    opts.originalText[locToPos(node.loc.start, opts)] === "<" &&
+                    node.body.body[0]?.loc &&
+                    node.loc.start.line < node.body.body[0].loc.start.line))
                   ? b.hardline
                   : joinSep;
 
@@ -839,16 +840,12 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                     if (opts.markoSyntax === "html") {
                       const wrapSep =
-                        node.var ||
-                        node.body.params.length ||
-                        node.arguments?.length ||
-                        node.attributes.length ||
-                        (!bodyOverride &&
-                          node.body.body.some(
-                            (child) =>
-                              child.type === "MarkoScriptlet" ||
-                              !isTextLike(child, node, opts as any),
-                          ))
+                        !bodyOverride &&
+                        node.body.body.some(
+                          (child) =>
+                            child.type === "MarkoScriptlet" ||
+                            !isTextLike(child, node, opts as any),
+                        )
                           ? b.hardline
                           : b.softline;
                       doc.push(

@@ -4,14 +4,12 @@
     <title>Marko Templating Engine</title>
   </head>
   <body>
-    <h1>Hello ${data.name}!</h1>
+    <h1>
+      Hello ${data.name}!
+    </h1>
     <ul if(notEmpty(data.colors))>
-      <li for(color in data.colors)>
-        ${color}
-      </li>
+      <li for(color in data.colors)>${color}</li>
     </ul>
-    <div else>
-      No colors!
-    </div>
+    <div else>No colors!</div>
   </body>
 </html>
