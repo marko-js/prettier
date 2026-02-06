@@ -1,8 +1,7 @@
 import { AstPath, ParserOptions } from "prettier";
 import type { types as t } from "@marko/compiler";
 import locToPos from "./loc-to-pos";
-import babelGenerator from "@babel/generator";
-const generate = (babelGenerator as any).default || babelGenerator;
+import { generator } from "@marko/compiler/internal/babel";
 
 export function getOriginalCodeForNode(
   opts: ParserOptions<t.Node>,
@@ -28,7 +27,7 @@ export function getOriginalCodeForNode(
 
   const loc = node.loc;
   if (!loc) {
-    return generate(node as any, {
+    return generator(node, {
       filename: opts.filepath,
       compact: false,
       comments: true,
