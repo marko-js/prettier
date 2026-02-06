@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "author": "Dylan Piercey <dpiercey@ebay.com>",
   "bugs": "https://github.com/marko-js/prettier/issues",
+  "dependencies": {
+    "@marko/compiler": "^5.39.52"
+  },
   "devDependencies": {
-    "@babel/generator": "^7.28.3",
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
@@ -22,7 +24,7 @@
     "fixpack": "^4.0.0",
     "husky": "^8.0.3",
     "lint-staged": "^14.0.1",
-    "marko": "^5.37.43",
+    "marko": "^5.38.21",
     "mocha": "^10.7.3",
     "mocha-snap": "^5.0.0",
     "nyc": "^15.1.0",
@@ -52,7 +54,6 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "peerDependencies": {
-    "@marko/compiler": "^5",
     "prettier": "^3"
   },
   "publishConfig": {
