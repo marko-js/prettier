@@ -1,7 +1,7 @@
 {
   "name": "prettier-plugin-marko",
   "description": "A prettier plugin for parsing and printing Marko files",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "author": "Dylan Piercey <dpiercey@ebay.com>",
   "bugs": "https://github.com/marko-js/prettier/issues",
   "dependencies": {
