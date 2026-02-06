@@ -547,10 +547,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           }
 
           if (node.default || !t.isBooleanLiteral(value, { value: true })) {
-            if (
-              t.isFunctionExpression(value) &&
-              !(value.id || value.async || value.generator)
-            ) {
+            if (canInlineMethod(value)) {
               doc.push(attrPath.call(print, "value"));
             } else {
               doc.push(
@@ -1103,8 +1100,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           } else if (
             parentType === "MarkoAttribute" &&
             path.key === "value" &&
-            node.type === "FunctionExpression" &&
-            !(node.async || node.generator || node.id)
+            canInlineMethod(node)
           ) {
             return tryPrintEmbed(
               `({_${code.replace(/^\s*function\s*/, "")}})`,
@@ -1442,5 +1438,15 @@ function isEmpty(node: Compiler.types.Statement) {
     node.type === "EmptyStatement" &&
     !node.leadingComments &&
     !node.trailingComments
+  );
+}
+
+function canInlineMethod(
+  node: types.Node,
+): node is types.FunctionExpression | types.ArrowFunctionExpression {
+  // TODO: support parenthesized methods.
+  return (
+    node.type === "FunctionExpression" &&
+    !(node.id || node.async || node.generator)
   );
 }
