@@ -1396,6 +1396,7 @@ function setConfig(config: Config) {
       caller: { name: "@marko/prettier" },
       babelrc: false,
       configFile: false,
+      browserslistConfigFile: false,
       parserOpts: {
         allowUndeclaredExports: true,
         allowAwaitOutsideFunction: true,
