@@ -439,6 +439,14 @@ export const printers: Record<string, Printer<types.Node>> = {
                   }
                 }
 
+                if (
+                  isText &&
+                  isSpacePlaceholder(childNode) &&
+                  childPath.next?.type === "MarkoTag"
+                ) {
+                  return;
+                }
+
                 if (isText) {
                   if (preserveSpace && opts.markoSyntax === "concise") {
                     bodyDocs.push(
@@ -469,11 +477,51 @@ export const printers: Record<string, Printer<types.Node>> = {
 
                   if (!isText) {
                     textDocs = [];
-                    bodyDocs.push(
-                      leadingLine
-                        ? b.group([b.softline, print(childPath)])
-                        : print(childPath),
-                    );
+                    const prevTextValue =
+                      childPath.previous?.type === "MarkoText"
+                        ? childPath.previous.value
+                        : "";
+                    if (
+                      !preserveSpace &&
+                      (isSpacePlaceholder(childPath.previous) ||
+                        (opts.markoSyntax === "html" &&
+                          typeof prevTextValue === "string" &&
+                          prevTextValue.endsWith(" ") &&
+                          prevTextValue.trim().length > 0 &&
+                          !prevTextValue.includes("\n")))
+                    ) {
+                      const last = bodyDocs.pop()!;
+                      const lastDocs = Array.isArray(last) ? last : [last];
+                      const tagDoc = b.group(print(childPath));
+                      const spacePlaceholder = opts.singleQuote
+                        ? "${' '}"
+                        : '${" "}';
+                      if (isSpacePlaceholder(childPath.previous)) {
+                        bodyDocs.push(
+                          b.group([
+                            ...lastDocs,
+                            spacePlaceholder,
+                            b.hardline,
+                            tagDoc,
+                          ]),
+                        );
+                      } else {
+                        bodyDocs.push(
+                          b.group([
+                            ...lastDocs,
+                            b.ifBreak(spacePlaceholder, " "),
+                            b.softline,
+                            tagDoc,
+                          ]),
+                        );
+                      }
+                    } else {
+                      bodyDocs.push(
+                        leadingLine
+                          ? b.group([b.softline, b.group(print(childPath))])
+                          : b.group(print(childPath)),
+                      );
+                    }
                     leadingLine = false;
                   }
                 } else {
@@ -614,6 +662,7 @@ export const printers: Record<string, Printer<types.Node>> = {
           );
         }
         case "MarkoPlaceholder":
+          if (node.value.type == "StringLiteral") return node.value.value;
           return [
             node.escape ? "${" : "$!{",
             (path as AstPath<types.MarkoPlaceholder>).call(print, "value"),
@@ -678,25 +727,40 @@ export const printers: Record<string, Printer<types.Node>> = {
             return asLiteralTextContent(value);
           }
 
-          let prefix = "";
-          let suffix = "";
+          let prefix: Doc = "";
+          let suffix: Doc = "";
+          const spacePlaceholder = opts.singleQuote ? "${' '}" : '${" "}';
 
           if (
             value[0] === " " &&
             !(path.previous && isTextLike(path.previous, parent, opts)) &&
             (isConcise || path.parent?.type === "Program" || path.isFirst)
           ) {
-            prefix = opts.singleQuote ? "${' '}" : '${" "}';
+            prefix = spacePlaceholder;
             value = value.slice(1);
           }
 
           const last = value.length - 1;
+          const nextNode = path.next;
+          const nextIsSpacePlaceholder = isSpacePlaceholder(nextNode);
           if (
             value[last] === " " &&
-            !(path.next && isTextLike(path.next, parent, opts)) &&
-            (isConcise || path.parent?.type === "Program" || path.isLast)
+            (nextIsSpacePlaceholder ||
+              (path.next?.type === "MarkoTag" &&
+                opts.markoSyntax === "html" &&
+                value.trim().length > 0))
           ) {
-            suffix = opts.singleQuote ? "${' '}" : '${" "}';
+            suffix = "";
+            value = value.slice(0, last);
+          } else if (
+            value[last] === " " &&
+            !(path.next && isTextLike(path.next, parent, opts)) &&
+            (isConcise ||
+              path.parent?.type === "Program" ||
+              path.isLast ||
+              (path.next?.type === "MarkoTag" && value.trim().length > 0))
+          ) {
+            suffix = spacePlaceholder;
             value = value.slice(0, last);
           }
 
@@ -1472,6 +1536,14 @@ function isEmpty(node: Compiler.types.Statement) {
     node.type === "EmptyStatement" &&
     !node.leadingComments &&
     !node.trailingComments
+  );
+}
+
+function isSpacePlaceholder(node: types.Node | null | undefined) {
+  return (
+    node?.type === "MarkoPlaceholder" &&
+    node.value.type === "StringLiteral" &&
+    node.value.value === " "
   );
 }
 
