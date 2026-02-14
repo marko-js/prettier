@@ -722,7 +722,7 @@ const embedPlaceholder: EmbedFn = async (toDoc, _print, path, opts) => {
   }
 
   return b.group([
-    "${",
+    node.escape ? "${" : "$!{",
     b.indent([b.softline, await toDoc(code, exprParse)]),
     b.softline,
     "}",
