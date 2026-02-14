@@ -1,7 +1,6 @@
 {
-  "timeout": "5000",
-  "extension": ["js", "ts"],
+  "extension": ["ts"],
   "enable-source-maps": true,
-  "watchFiles": ["src/**/*.ts", "src/**/__tests__/fixtures/**/*.marko"],
-  "require": ["esbuild-register", "mocha-snap"]
+  "watchFiles": ["src/**/*.ts"],
+  "require": ["tsx", "mocha-snap"]
 }

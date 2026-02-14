@@ -1,0 +1,35 @@
+style {
+  @import "./thing.css";
+  body {
+    color: blue;
+  }
+}
+
+style.less {
+  @import "./thing.css";
+  body {
+    &nested {
+      color: blue;
+    }
+  }
+}
+
+style.unknown {
+  foo;
+  bar
+}
+<style>
+  @import "./thing.css";
+  body {
+    color: blue;
+  }
+</style>
+
+<style.less>
+  @import "./thing.css";
+  body {
+    &nested {
+      color: blue;
+    }
+  }
+</style>

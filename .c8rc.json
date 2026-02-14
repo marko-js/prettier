@@ -1,0 +1,5 @@
+{
+  "parserPlugins": ["typescript"],
+  "reporter": ["text-summary", "lcov"],
+  "include": ["src/**/*.ts"]
+}
