@@ -43,37 +43,25 @@ A [Prettier](https://prettier.io/) plugin for parsing and printing Marko files.
 npm install prettier prettier-plugin-marko -D
 ```
 
-### yarn
-
-```console
-yarn add prettier prettier-plugin-marko -D
-```
-
 # Usage
 
-## NPM 6
+See the Prettier ["using plugins"](https://prettier.io/docs/plugins#using-plugins) guide.
 
 ```console
-npx --no-install prettier --write "**/*.marko"
+npm exec -- prettier --write "**/*.marko" --plugin=prettier-plugin-marko
 ```
 
-## NPM 7
+Or via [prettier configuration](https://prettier.io/docs/configuration) like:
 
-```console
-npm exec -- prettier --write "**/*.marko"
-```
-
-## Yarn
-
-```console
-yarn prettier --write "**/*.marko"
+```json
+{
+  "plugins": ["prettier-plugin-marko"]
+}
 ```
 
 ## Editors
 
-Editors such as [Atom](https://atom.io/packages/prettier-atom) and [VSCode](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) provide plugins for calling [Prettier](https://prettier.io/) directly from your editor.
-
-If you'd like to use these plugins **without** installing `prettier-plugin-marko` in the project, you can also install `prettier-plugin-marko` globally with either [npm](https://docs.npmjs.com/downloading-and-installing-packages-globally), [yarn](https://classic.yarnpkg.com/en/docs/cli/global/) or your package manager choice.
+Editors such as [VSCode](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) provide plugins for calling [Prettier](https://prettier.io/) directly from your editor.
 
 # Options
 
@@ -85,11 +73,6 @@ Marko supports both an [html like](https://markojs.com/docs/syntax/) and [concis
 By default this plugin will try to detect the syntax you are already using and output a formatted document in that syntax.
 
 You can overide the default (`"auto"`) to enforce that all templates are formatted to the syntax of your choosing.
-
-## `markoAttrParen: boolean`
-
-For the most part Marko is very flexible when it comes to the [expressions uses within attributes](https://markojs.com/docs/syntax/#attributes).
-By default this plugin will not wrap attribute values in parenthesis unless absolutely necessary. By setting this value to true it will instead output parenthesis whenever the attribute value contains any unenclosed whitespace.
 
 # Code of Conduct
 
