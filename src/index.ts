@@ -324,7 +324,7 @@ const embedHandlers: EmbedHandlers = {
       : [];
   },
 
-  [NodeType.OpenTagName]: async (toDoc, _print, path, opts) =>
+  [NodeType.OpenTagName]: (toDoc, _print, path, opts) =>
     templateToDoc(toDoc, path, opts),
 
   [NodeType.Placeholder]: async (toDoc, _print, path, opts) => {
