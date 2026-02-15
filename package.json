@@ -1,6 +1,6 @@
 {
   "name": "prettier-plugin-marko",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "description": "A prettier plugin for parsing and printing Marko files",
   "keywords": [
     "format",
