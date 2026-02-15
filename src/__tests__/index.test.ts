@@ -121,3 +121,25 @@ function getCompiledText(filepath: string, source: string) {
 
   return text.replace(/\s+/g, " ");
 }
+
+describe("singleQuote mode", () => {
+  it("prints with single quotes", async () => {
+    const filepath = path.join(fixtures, "whitespace/template.marko"); // use existing fixture.
+    const source = fs.readFileSync(filepath, "utf-8");
+    const formatted = (
+      await format(source, {
+        filepath,
+        parser: "marko",
+        plugins: [plugin],
+        singleQuote: false,
+      })
+    ).replace(/"/g, "'");
+    const reformatted = await format(formatted, {
+      filepath,
+      parser: "marko",
+      plugins: [plugin],
+      singleQuote: true,
+    });
+    assert.equal(reformatted, formatted);
+  });
+});

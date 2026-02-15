@@ -15,6 +15,7 @@ import {
   NodeType,
   parse as parseMarko,
   type Parsed,
+  type Range,
   TagType,
 } from "./parser";
 import { getFormattedBody } from "./utils/get-formatted-body";
@@ -161,12 +162,14 @@ export const parsers: Record<string, Parser<AnyNode>> = {
 
       return program;
     },
+    /* c8 ignore start */
     locStart(node) {
       return node.start;
     },
     locEnd(node) {
       return node.end;
     },
+    /* c8 ignore end */
   },
 };
 
@@ -176,6 +179,7 @@ export const printers: Record<string, Printer<AnyNode>> = {
       const { type } = path.node;
       const handler = printHandlers[type] as PrintHandler<AnyNode>;
       if (handler) return handler(path, opts, print);
+      /* c8 ignore next */
       throw new Error(
         `Unknown node type in Marko template: ${NodeType[type] || type}`,
       );
@@ -352,13 +356,15 @@ const embedHandlers: EmbedHandlers = {
     if (!(node.args || node.value)) return name;
     const attrDoc: Doc[] = [name];
 
-    if (node.args) {
+    if (node.args && !isEmpty(node.args.value, opts)) {
       const argsDoc = await argsToDoc(node.args, opts, toDoc);
       if (argsDoc) {
         attrDoc.push(argsDoc);
+        /* c8 ignore start */
       } else {
         return unexpectedDoc(opts, node);
       }
+      /* c8 ignore stop */
     }
 
     if (node.value) {
@@ -375,9 +381,11 @@ const embedHandlers: EmbedHandlers = {
         ) {
           attrMethodDoc[0] = attrMethodDoc[0].replace(/^function\s*/, "");
           attrDoc.push(attrMethodDoc);
+          /* c8 ignore start */
         } else {
           return unexpectedDoc(opts, node);
         }
+        /* c8 ignore stop */
       } else {
         attrDoc.push(
           node.value.bound ? ":=" : "=",
@@ -424,116 +432,113 @@ const embedHandlers: EmbedHandlers = {
   [NodeType.TagVar]: async (toDoc, _print, path, opts) => {
     const { node } = path;
     const code = read(node.value, opts).trim();
-    if (code) {
-      let doc = await toDoc(`var ${code}=_`, stmtParse);
+    let doc = await toDoc(`var ${code}=_`, stmtParse);
 
-      if (Array.isArray(doc) && doc.length === 1) {
-        doc = doc[0];
-      }
+    if (Array.isArray(doc) && doc.length === 1) {
+      doc = doc[0];
+    }
 
+    if (
+      typeof doc === "object" &&
+      !Array.isArray(doc) &&
+      doc.type === "group"
+    ) {
+      doc = doc.contents;
+    }
+    if (Array.isArray(doc) && doc.length > 1) {
+      const varPart = doc[1];
       if (
-        typeof doc === "object" &&
-        !Array.isArray(doc) &&
-        doc.type === "group"
+        typeof varPart === "object" &&
+        "type" in varPart &&
+        varPart.type === "group" &&
+        Array.isArray(varPart.contents)
       ) {
-        doc = doc.contents;
-      }
-      if (Array.isArray(doc) && doc.length > 1) {
-        const varPart = doc[1];
-        if (
-          typeof varPart === "object" &&
-          "type" in varPart &&
-          varPart.type === "group" &&
-          Array.isArray(varPart.contents)
-        ) {
-          const varContents = varPart.contents;
-          for (let i = varContents.length; i--; ) {
-            const item = varContents[i];
-            if (typeof item === "string") {
-              // Walks back until we find the equals sign.
-              const match = /\s*=\s*$/.exec(item);
-              if (match) {
-                varContents[i] = item.slice(0, -match[0].length);
-                varContents.length = i + 1;
-                return ["/", varContents];
-              }
+        const varContents = varPart.contents;
+        for (let i = varContents.length; i--; ) {
+          const item = varContents[i];
+          if (typeof item === "string") {
+            // Walks back until we find the equals sign.
+            const match = /\s*=\s*$/.exec(item);
+            if (match) {
+              varContents[i] = item.slice(0, -match[0].length);
+              varContents.length = i + 1;
+              return ["/", varContents];
             }
           }
         }
+        /* c8 ignore start */
       }
-
-      return unexpectedDoc(opts, node);
     }
 
-    return [];
+    return unexpectedDoc(opts, node);
+    /* c8 ignore stop */
   },
 
   [NodeType.TagTypeArgs]: async (toDoc, _print, path, opts) => {
     const { node } = path;
+    if (isEmpty(node.value, opts)) return "";
+
     const code = read(node.value, opts).trim();
-    if (code) {
-      const doc = await toDoc(`_<${code}>`, exprParse);
-      if (typeof doc === "string") {
-        return doc.replace(/^_/, "");
-      }
-
-      if (Array.isArray(doc) && typeof doc[0] === "string") {
-        doc[0] = doc[0].replace(/^_/, "");
-        return doc;
-      }
-
-      return unexpectedDoc(opts, node);
+    const doc = await toDoc(`_<${code}>`, exprParse);
+    if (typeof doc === "string") {
+      return doc.replace(/^_/, "");
     }
 
-    return [];
+    if (Array.isArray(doc) && typeof doc[0] === "string") {
+      doc[0] = doc[0].replace(/^_/, "");
+      return doc;
+    }
+
+    /* c8 ignore next */
+    return unexpectedDoc(opts, node);
   },
 
   [NodeType.TagParams]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    const code = read(node.value, opts).trim();
-    if (code) {
-      const doc = await toDoc(`function _(${code}){}`, stmtParse);
-      if (Array.isArray(doc) && doc.length > 1) {
-        const paramsGroup = doc[1];
-        if (
-          paramsGroup &&
-          typeof paramsGroup === "object" &&
-          "type" in paramsGroup &&
-          paramsGroup.type === "group" &&
-          Array.isArray(paramsGroup.contents)
-        ) {
-          const paramsContents = [...paramsGroup.contents];
-          const first = paramsContents[0];
-          const last = paramsContents[paramsContents.length - 1];
-          if (typeof first === "string" && typeof last === "string") {
-            paramsContents[0] = first.replace(/^\(/, "|");
-            paramsContents[paramsContents.length - 1] = last.replace(
-              /\)$/,
-              "|",
-            );
-          }
+    if (isEmpty(node.value, opts)) return "";
 
-          return b.group(paramsContents);
+    const code = read(node.value, opts).trim();
+    const doc = await toDoc(`function _(${code}){}`, stmtParse);
+
+    if (Array.isArray(doc) && doc.length > 1) {
+      const paramsGroup = doc[1];
+      if (
+        paramsGroup &&
+        typeof paramsGroup === "object" &&
+        "type" in paramsGroup &&
+        paramsGroup.type === "group" &&
+        Array.isArray(paramsGroup.contents)
+      ) {
+        const paramsContents = [...paramsGroup.contents];
+        const first = paramsContents[0];
+        const last = paramsContents[paramsContents.length - 1];
+        if (typeof first === "string" && typeof last === "string") {
+          paramsContents[0] = first.replace(/^\(/, "|");
+          paramsContents[paramsContents.length - 1] = last.replace(/\)$/, "|");
         }
+
+        return b.group(paramsContents);
       }
-      return unexpectedDoc(opts, node);
     }
 
-    return [];
+    /* c8 ignore next */
+    return unexpectedDoc(opts, node);
   },
 
   [NodeType.TagTypeParams]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    const code = read(node.value, opts).trim();
-    if (code) {
-      const doc = await toDoc(`function _<${code}>(){}`, stmtParse);
-      if (Array.isArray(doc) && doc.length > 1) {
-        return doc[1];
-      }
-      return unexpectedDoc(opts, node);
+    if (isEmpty(node.parent.params?.value, opts) || isEmpty(node.value, opts)) {
+      return "";
     }
 
-    return [];
+    const code = read(node.value, opts).trim();
+    const doc = await toDoc(`function _<${code}>(){}`, stmtParse);
+    if (Array.isArray(doc) && doc.length > 1) {
+      return doc[1];
+    }
+
+    /* c8 ignore next */
+    return unexpectedDoc(opts, node);
   },
 };
 
@@ -650,14 +655,14 @@ function printConciseTag(
 
 function printTagBeforeAttrs(
   path: AstPath<Node.Tag | Node.AttrTag>,
-  _opts: Options,
+  opts: Options,
   print: PrintFn,
 ) {
   const { node } = path;
   const name = path.call(print, "name");
   const doc: Doc[] = [name];
 
-  if (pathHas(path, "typeArgs")) {
+  if (pathHas(path, "typeArgs") && !isEmpty(path.node.typeArgs.value, opts)) {
     doc.push(path.call(print, "typeArgs"));
   }
 
@@ -669,7 +674,7 @@ function printTagBeforeAttrs(
     doc.push(path.map(print, "shorthandClassNames"));
   }
 
-  if (pathHas(path, "args")) {
+  if (pathHas(path, "args") && !isEmpty(path.node.args.value, opts)) {
     doc.push(path.call(print, "args"));
   }
 
@@ -677,8 +682,11 @@ function printTagBeforeAttrs(
     doc.push(path.call(print, "var"));
   }
 
-  if (pathHas(path, "params")) {
-    if (pathHas(path, "typeParams")) {
+  if (pathHas(path, "params") && !isEmpty(path.node.params.value, opts)) {
+    if (
+      pathHas(path, "typeParams") &&
+      !isEmpty(path.node.typeParams.value, opts)
+    ) {
       if (!(node.typeArgs || node.args || node.var)) {
         doc.push(" ");
       }
@@ -708,7 +716,6 @@ function printBody(
   if (preserve) {
     path.each((child) => {
       const childDoc = child.call(print);
-      if (!childDoc) return;
       content ||= [];
 
       if (isInline(child.node)) {
@@ -810,15 +817,7 @@ function printBody(
 
           case NodeType.Placeholder:
             if (typeof childDoc === "string" && isVisibleSpace(childDoc)) {
-              if (endsWithLine(inline)) {
-                const last = inline.length - 1;
-                if (inline[last] === b.softline) {
-                  inline[last] = b.line;
-                }
-
-                return;
-              }
-
+              if (endsWithLine(inline)) return;
               childDoc = b.line;
             }
             break;
@@ -917,17 +916,17 @@ async function argsToDoc(
   opts: Options,
   toDoc: ToDocFn,
 ) {
+  if (isEmpty(node.value, opts)) return "";
+
   const code = read(node.value, opts).trim();
-  if (code) {
-    const doc = await toDoc(`_(${code})`, exprParse);
-    if (Array.isArray(doc) && doc.length && typeof doc[0] === "string") {
-      doc[0] = doc[0].replace(/^_/, "");
-      return doc;
-    }
-    return unexpectedDoc(opts, node);
+  const doc = await toDoc(`_(${code})`, exprParse);
+  if (Array.isArray(doc) && doc.length && typeof doc[0] === "string") {
+    doc[0] = doc[0].replace(/^_/, "");
+    return doc;
   }
 
-  return [];
+  /* c8 ignore next */
+  return unexpectedDoc(opts, node);
 }
 
 function wrapConciseText(doc: Doc) {
@@ -1088,6 +1087,16 @@ function endsWithLine(doc: Doc[]) {
   }
 }
 
+const nonWhitespaceReg = /\S/g;
+function isEmpty(range: Range | undefined, opts: Options) {
+  if (!range || range.start === range.end) return true;
+  nonWhitespaceReg.lastIndex = range.start;
+  return !(
+    nonWhitespaceReg.test(opts._markoParsed!.code) &&
+    nonWhitespaceReg.lastIndex <= range.end
+  );
+}
+
 function pathHas<T extends AnyNode, K extends keyof T>(
   path: AstPath<T>,
   key: K,
@@ -1095,6 +1104,7 @@ function pathHas<T extends AnyNode, K extends keyof T>(
   return !!path.node[key];
 }
 
+/* c8 ignore start */
 function unexpectedDoc(opts: Options, node: AnyNode) {
   const parsed = opts._markoParsed!;
   const pos = parsed.positionAt(node.start);
@@ -1109,3 +1119,4 @@ function unexpectedDoc(opts: Options, node: AnyNode) {
   );
   return undefined;
 }
+/* c8 ignore stop */
