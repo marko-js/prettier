@@ -47,15 +47,29 @@ declare module "prettier" {
 }
 
 type AnyNode = Node.AnyNode;
-type PrintFn<T extends AnyNode> = (
+type ToDocFn = (text: string, options: Options) => Promise<Doc>;
+type PrintFn = (path: AstPath<AnyNode>) => Doc;
+
+type EmbedHandler<T extends AnyNode> = (
+  toDoc: ToDocFn,
+  print: (
+    selector?: string | number | Array<string | number> | AstPath<AnyNode>,
+  ) => Doc,
+  path: AstPath<T>,
+  options: Options,
+) => Promise<Doc | undefined> | Doc | undefined;
+type EmbedHandlers = {
+  [K in NodeType]?: EmbedHandler<AnyNode & { type: K }>;
+};
+
+type PrintHandler<T extends AnyNode> = (
   path: AstPath<T>,
   opts: ParserOptions<AnyNode>,
-  print: (path: AstPath<AnyNode>) => Doc,
+  print: PrintFn,
 ) => Doc;
-type EmbedFn = Extract<
-  ReturnType<NonNullable<Printer<AnyNode>["embed"]>>,
-  (...args: any[]) => any
->;
+type PrintHandlers = {
+  [K in NodeType]?: PrintHandler<AnyNode & { type: K }>;
+};
 
 type Body = ReturnType<typeof printBody>;
 
@@ -159,98 +173,15 @@ export const parsers: Record<string, Parser<AnyNode>> = {
 export const printers: Record<string, Printer<AnyNode>> = {
   "marko-ast": {
     print(path, opts, print) {
-      const { node } = path;
-      switch (node.type) {
-        case NodeType.AttrArgs:
-        case NodeType.AttrMethod:
-        case NodeType.AttrNamed:
-        case NodeType.AttrSpread:
-        case NodeType.Class:
-        case NodeType.Export:
-        case NodeType.Import:
-        case NodeType.OpenTagName:
-        case NodeType.Placeholder:
-        case NodeType.Scriptlet:
-        case NodeType.ShorthandClassName:
-        case NodeType.ShorthandId:
-        case NodeType.Static:
-        case NodeType.Style:
-        case NodeType.TagArgs:
-        case NodeType.TagParams:
-        case NodeType.TagTypeArgs:
-        case NodeType.TagTypeParams:
-        case NodeType.TagVar:
-          return printExact(path, opts, print);
-        case NodeType.CDATA:
-          return printCDATA(path as AstPath<Node.CDATA>, opts, print);
-        case NodeType.Comment:
-          return printComment(path as AstPath<Node.Comment>, opts, print);
-        case NodeType.Doctype:
-          return printDoctype(path as AstPath<Node.Doctype>, opts, print);
-        case NodeType.Declaration:
-          return printDeclaration(
-            path as AstPath<Node.Declaration>,
-            opts,
-            print,
-          );
-        case NodeType.Program:
-          return printProgram(path as AstPath<Node.Program>, opts, print);
-        case NodeType.Tag:
-        case NodeType.AttrTag:
-          return printTag(
-            path as AstPath<Node.Tag | Node.AttrTag>,
-            opts,
-            print,
-          );
-        case NodeType.Text:
-          return printText(path as AstPath<Node.Text>, opts, print);
-        default:
-          throw new Error(
-            `Unknown node type in Marko template: ${NodeType[node.type] || node.type}`,
-          );
-      }
+      const { type } = path.node;
+      const handler = printHandlers[type] as PrintHandler<AnyNode>;
+      if (handler) return handler(path, opts, print);
+      throw new Error(
+        `Unknown node type in Marko template: ${NodeType[type] || type}`,
+      );
     },
-    embed(path, opts) {
-      switch (path.node?.type as NodeType | undefined) {
-        case NodeType.AttrNamed:
-          return embedAttrNamed;
-        case NodeType.AttrSpread:
-          return embedAttrSpread;
-        case NodeType.Class:
-          return embedClass;
-        case NodeType.Export:
-          return embedExport;
-        case NodeType.Import:
-          return embedImport;
-        case NodeType.OpenTagName:
-          return embedOpenTagName;
-        case NodeType.Placeholder:
-          return embedPlaceholder;
-        case NodeType.Scriptlet:
-          return embedScriptlet;
-        case NodeType.ShorthandClassName:
-          return embedShorthandClassName;
-        case NodeType.ShorthandId:
-          return embedShorthandId;
-        case NodeType.Static:
-          return embedStatic;
-        case NodeType.Style:
-          return embedStyle;
-        case NodeType.Tag:
-          return embedTag(path, opts);
-        case NodeType.TagArgs:
-          return embedTagArgs;
-        case NodeType.TagParams:
-          return embedTagParams;
-        case NodeType.TagTypeArgs:
-          return embedTagTypeArgs;
-        case NodeType.TagTypeParams:
-          return embedTagTypeParams;
-        case NodeType.TagVar:
-          return embedTagVar;
-      }
-
-      return null;
+    embed(path) {
+      return embedHandlers[path.node.type as NodeType] ?? null;
     },
     getVisitorKeys(node) {
       return (
@@ -260,87 +191,372 @@ export const printers: Record<string, Printer<AnyNode>> = {
   },
 };
 
-const printProgram: PrintFn<Node.Program> = (path, opts, print) => {
-  const body = printBody(path, opts, print);
-  const lastStatic = path.node.static.length - (body ? 0 : 1);
-  let programDoc = path.map(
-    (child, i) =>
-      i !== lastStatic && hasExplicitLine(child, opts)
-        ? [child.call(print), b.hardline]
-        : child.call(print),
-    "static",
-  );
+const printHandlers: PrintHandlers = {
+  [NodeType.AttrArgs]: printExact,
+  [NodeType.AttrMethod]: printExact,
+  [NodeType.AttrNamed]: printExact,
+  [NodeType.AttrSpread]: printExact,
+  [NodeType.Class]: printExact,
+  [NodeType.Export]: printExact,
+  [NodeType.Import]: printExact,
+  [NodeType.OpenTagName]: printExact,
+  [NodeType.Placeholder]: printExact,
+  [NodeType.Scriptlet]: printExact,
+  [NodeType.ShorthandClassName]: printExact,
+  [NodeType.ShorthandId]: printExact,
+  [NodeType.Static]: printExact,
+  [NodeType.Style]: printExact,
+  [NodeType.TagArgs]: printExact,
+  [NodeType.TagParams]: printExact,
+  [NodeType.TagTypeArgs]: printExact,
+  [NodeType.TagTypeParams]: printExact,
+  [NodeType.TagVar]: printExact,
+  [NodeType.Tag]: printTag,
+  [NodeType.AttrTag]: printTag,
+  [NodeType.CDATA]: (path, opts) =>
+    `<![CDATA[${read(path.node.value, opts)}]]>`,
+  [NodeType.Comment]: (path, opts) => {
+    const { node } = path;
+    const code = read(node, opts);
+    if (node.block) {
+      if (code.includes("\n")) {
+        const lines = code.split("\n");
+        const len = lines.length;
+        let indent = Infinity;
 
-  if (body) {
-    if (body.inline) {
-      programDoc.push(wrapConciseText(body.content));
-    } else {
-      programDoc = [...programDoc, ...body.content];
+        for (let i = 1; i < len; i++) {
+          const match = lines[i].match(/^(\s+)/);
+          if (match) {
+            indent = Math.min(indent, match[1].length);
+          } else {
+            indent = 0;
+            break;
+          }
+        }
+
+        const parts: Doc[] = [lines[0]];
+        for (let i = 1; i < len; i++) {
+          parts.push(b.hardline, indent ? lines[i].slice(indent) : lines[i]);
+        }
+        return parts;
+      }
+
+      return code;
     }
-  }
 
-  return [b.join(b.hardline, programDoc), b.hardline];
+    return b.lineSuffix(code);
+  },
+  [NodeType.Doctype]: (path, opts) =>
+    `<!${read(path.node.value, opts).replace(/\s+/g, " ").trim()}>`,
+  [NodeType.Declaration]: (path, opts) =>
+    `<?${read(path.node.value, opts).trim()}?>`,
+  [NodeType.Program]: (path, opts, print) => {
+    const body = printBody(path, opts, print);
+    const lastStatic = path.node.static.length - (body ? 0 : 1);
+    let programDoc = path.map(
+      (child, i) =>
+        i !== lastStatic && hasExplicitLine(child, opts)
+          ? [child.call(print), b.hardline]
+          : child.call(print),
+      "static",
+    );
+
+    if (body) {
+      if (body.inline) {
+        programDoc.push(wrapConciseText(body.content));
+      } else {
+        programDoc = [...programDoc, ...body.content];
+      }
+    }
+
+    return [b.join(b.hardline, programDoc), b.hardline];
+  },
+  [NodeType.Text]: (path, opts) => {
+    const text = read(path.node, opts).replace(/\\/g, "\\\\");
+    return /^\$!?{/.test(text) ? "\\" + text : text;
+  },
 };
 
-const printDoctype: PrintFn<Node.Doctype> = (path, opts) => {
-  return `<!${read(path.node.value, opts).replace(/\s+/g, " ").trim()}>`;
-};
+const embedHandlers: EmbedHandlers = {
+  [NodeType.Class]: (toDoc, _print, path, opts) =>
+    toDoc(read(path.node, opts), exprParse),
 
-const printDeclaration: PrintFn<Node.Declaration> = (path, opts) => {
-  return `<?${read(path.node.value, opts).trim()}?>`;
-};
+  [NodeType.Import]: (toDoc, _print, path, opts) =>
+    toDoc(read(path.node, opts), stmtParse),
 
-const printCDATA: PrintFn<Node.CDATA> = (path, opts) => {
-  return `<![CDATA[${read(path.node.value, opts)}]]>`;
-};
+  [NodeType.Export]: (toDoc, _print, path, opts) =>
+    toDoc(read(path.node, opts), stmtParse),
 
-const printComment: PrintFn<Node.Comment> = (path, opts) => {
-  const { node } = path;
-  const code = read(node, opts);
-  if (node.block) {
-    if (code.includes("\n")) {
-      const lines = code.split("\n");
-      const len = lines.length;
-      let indent = Infinity;
+  [NodeType.Style]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts).trim();
+    const parser = getParserFromExt(
+      node.ext?.slice(node.ext.lastIndexOf(".")) || ".css",
+    );
 
-      for (let i = 1; i < len; i++) {
-        const match = lines[i].match(/^(\s+)/);
-        if (match) {
-          indent = Math.min(indent, match[1].length);
+    if (parser) {
+      return b.group([
+        `style${node.ext || ""} {`,
+        b.indent([b.line, await toDoc(code, { parser })]),
+        b.line,
+        "}",
+      ]);
+    }
+  },
+
+  [NodeType.Static]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = opts
+      ._markoParsed!.code.slice(node.start + node.target.length + 1, node.end)
+      .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
+      .trim();
+    return code
+      ? [`${node.target} `, withBlockIfNeeded(await toDoc(code, stmtParse))]
+      : [];
+  },
+
+  [NodeType.Scriptlet]: async (toDoc, _print, path, opts) => {
+    const code = read(path.node.value, opts)
+      .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
+      .trim();
+    return code
+      ? [b.breakParent, "$ ", withBlockIfNeeded(await toDoc(code, stmtParse))]
+      : [];
+  },
+
+  [NodeType.OpenTagName]: async (toDoc, _print, path, opts) =>
+    templateToDoc(toDoc, path, opts),
+
+  [NodeType.Placeholder]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts);
+
+    if (code === '" "' || code === "' '") {
+      return getVisibleSpace(opts);
+    }
+
+    return b.group([
+      node.escape ? "${" : "$!{",
+      b.indent([b.softline, await toDoc(code, exprParse)]),
+      b.softline,
+      "}",
+    ]);
+  },
+
+  [NodeType.TagArgs]: (toDoc, _print, path, opts) =>
+    argsToDoc(path.node, opts, toDoc),
+
+  [NodeType.AttrNamed]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const name = read(node.name, opts);
+    if (!(node.args || node.value)) return name;
+    const attrDoc: Doc[] = [name];
+
+    if (node.args) {
+      const argsDoc = await argsToDoc(node.args, opts, toDoc);
+      if (argsDoc) {
+        attrDoc.push(argsDoc);
+      } else {
+        return unexpectedDoc(opts, node);
+      }
+    }
+
+    if (node.value) {
+      if (node.value.type === NodeType.AttrMethod) {
+        const attrMethodDoc = await toDoc(
+          `function${read(node.value, opts)}`,
+          exprParse,
+        );
+
+        if (
+          Array.isArray(attrMethodDoc) &&
+          attrMethodDoc.length &&
+          typeof attrMethodDoc[0] === "string"
+        ) {
+          attrMethodDoc[0] = attrMethodDoc[0].replace(/^function\s*/, "");
+          attrDoc.push(attrMethodDoc);
         } else {
-          indent = 0;
-          break;
+          return unexpectedDoc(opts, node);
+        }
+      } else {
+        attrDoc.push(
+          node.value.bound ? ":=" : "=",
+          withParensIfNeeded(
+            await toDoc(read(node.value.value, opts), exprParse),
+            isConcise(opts),
+          ),
+        );
+      }
+    }
+    return b.group(attrDoc);
+  },
+
+  [NodeType.AttrSpread]: async (toDoc, _print, path, opts) => {
+    return b.group([
+      "...",
+      withParensIfNeeded(
+        await toDoc(read(path.node.value, opts), exprParse),
+        isConcise(opts),
+      ),
+    ]);
+  },
+
+  [NodeType.ShorthandId]: async (toDoc, _print, path, opts) => [
+    "#",
+    await templateToDoc(toDoc, path, opts),
+  ],
+
+  [NodeType.ShorthandClassName]: async (toDoc, _print, path, opts) => [
+    ".",
+    await templateToDoc(toDoc, path, opts),
+  ],
+
+  [NodeType.Tag]: async (toDoc, print, path, opts) => {
+    const parser = getTagParser(path.node, opts);
+    if (parser === undefined) return undefined;
+    return printTag(path, opts as ParserOptions<Node.AnyNode>, print, {
+      inline: true,
+      preserve: parser === false,
+      content: await getFormattedBody(path, parser, toDoc, print, opts),
+    });
+  },
+
+  [NodeType.TagVar]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts).trim();
+    if (code) {
+      let doc = await toDoc(`var ${code}=_`, stmtParse);
+
+      if (Array.isArray(doc) && doc.length === 1) {
+        doc = doc[0];
+      }
+
+      if (
+        typeof doc === "object" &&
+        !Array.isArray(doc) &&
+        doc.type === "group"
+      ) {
+        doc = doc.contents;
+      }
+      if (Array.isArray(doc) && doc.length > 1) {
+        const varPart = doc[1];
+        if (
+          typeof varPart === "object" &&
+          "type" in varPart &&
+          varPart.type === "group" &&
+          Array.isArray(varPart.contents)
+        ) {
+          const varContents = varPart.contents;
+          for (let i = varContents.length; i--; ) {
+            const item = varContents[i];
+            if (typeof item === "string") {
+              // Walks back until we find the equals sign.
+              const match = /\s*=\s*$/.exec(item);
+              if (match) {
+                varContents[i] = item.slice(0, -match[0].length);
+                varContents.length = i + 1;
+                return ["/", varContents];
+              }
+            }
+          }
         }
       }
 
-      const parts: Doc[] = [lines[0]];
-      for (let i = 1; i < len; i++) {
-        parts.push(b.hardline, indent ? lines[i].slice(indent) : lines[i]);
-      }
-      return parts;
+      return unexpectedDoc(opts, node);
     }
 
-    return code;
-  }
+    return [];
+  },
 
-  return b.lineSuffix(code);
+  [NodeType.TagTypeArgs]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts).trim();
+    if (code) {
+      const doc = await toDoc(`_<${code}>`, exprParse);
+      if (typeof doc === "string") {
+        return doc.replace(/^_/, "");
+      }
+
+      if (Array.isArray(doc) && typeof doc[0] === "string") {
+        doc[0] = doc[0].replace(/^_/, "");
+        return doc;
+      }
+
+      return unexpectedDoc(opts, node);
+    }
+
+    return [];
+  },
+
+  [NodeType.TagParams]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts).trim();
+    if (code) {
+      const doc = await toDoc(`function _(${code}){}`, stmtParse);
+      if (Array.isArray(doc) && doc.length > 1) {
+        const paramsGroup = doc[1];
+        if (
+          paramsGroup &&
+          typeof paramsGroup === "object" &&
+          "type" in paramsGroup &&
+          paramsGroup.type === "group" &&
+          Array.isArray(paramsGroup.contents)
+        ) {
+          const paramsContents = [...paramsGroup.contents];
+          const first = paramsContents[0];
+          const last = paramsContents[paramsContents.length - 1];
+          if (typeof first === "string" && typeof last === "string") {
+            paramsContents[0] = first.replace(/^\(/, "|");
+            paramsContents[paramsContents.length - 1] = last.replace(
+              /\)$/,
+              "|",
+            );
+          }
+
+          return b.group(paramsContents);
+        }
+      }
+      return unexpectedDoc(opts, node);
+    }
+
+    return [];
+  },
+
+  [NodeType.TagTypeParams]: async (toDoc, _print, path, opts) => {
+    const { node } = path;
+    const code = read(node.value, opts).trim();
+    if (code) {
+      const doc = await toDoc(`function _<${code}>(){}`, stmtParse);
+      if (Array.isArray(doc) && doc.length > 1) {
+        return doc[1];
+      }
+      return unexpectedDoc(opts, node);
+    }
+
+    return [];
+  },
 };
 
-const printTag = ((
-  path,
-  opts,
-  print,
+function printTag(
+  path: AstPath<Node.Tag | Node.AttrTag>,
+  opts: ParserOptions<AnyNode>,
+  print: PrintFn,
   body: Body = printBody(path, opts, print),
-) => {
+) {
   return (isConcise(opts) ? printConciseTag : printHTMLTag)(
     path,
     opts,
     print,
     body,
   );
-}) satisfies PrintFn<Node.Tag | Node.AttrTag>;
+}
 
-const printHTMLTag = ((path, opts, print, body?: Body) => {
+function printHTMLTag(
+  path: AstPath<Node.Tag | Node.AttrTag>,
+  opts: ParserOptions<AnyNode>,
+  print: PrintFn,
+  body: Body,
+) {
   const { node } = path;
   const openTagDoc: Doc[] = ["<", printTagBeforeAttrs(path, opts, print)];
 
@@ -386,9 +602,14 @@ const printHTMLTag = ((path, opts, print, body?: Body) => {
   }
 
   return b.group(openTagDoc);
-}) satisfies PrintFn<Node.Tag | Node.AttrTag>;
+}
 
-const printConciseTag = ((path, opts, print, body?: Body) => {
+function printConciseTag(
+  path: AstPath<Node.Tag | Node.AttrTag>,
+  opts: ParserOptions<AnyNode>,
+  print: PrintFn,
+  body: Body,
+) {
   const { node } = path;
   const tagDoc: Doc[] = [printTagBeforeAttrs(path, opts, print)];
 
@@ -425,13 +646,13 @@ const printConciseTag = ((path, opts, print, body?: Body) => {
   }
 
   return b.group(tagDoc);
-}) satisfies PrintFn<Node.Tag | Node.AttrTag>;
+}
 
-const printTagBeforeAttrs: PrintFn<Node.Tag | Node.AttrTag> = (
-  path,
-  _opts,
-  print,
-) => {
+function printTagBeforeAttrs(
+  path: AstPath<Node.Tag | Node.AttrTag>,
+  _opts: Options,
+  print: PrintFn,
+) {
   const { node } = path;
   const name = path.call(print, "name");
   const doc: Doc[] = [name];
@@ -467,13 +688,13 @@ const printTagBeforeAttrs: PrintFn<Node.Tag | Node.AttrTag> = (
   }
 
   return doc.length === 1 ? name : doc;
-};
+}
 
-const printBody = (
+function printBody(
   path: AstPath<Node.ParentNode>,
   opts: Options,
-  print: (path: AstPath<Node.AnyNode>) => Doc,
-) => {
+  print: PrintFn,
+) {
   const { node } = path;
   if (!node.body) return;
 
@@ -654,283 +875,18 @@ const printBody = (
       content,
     } as const;
   }
-};
+}
 
-const printText: PrintFn<Node.Text> = (path, opts) => {
-  const text = read(path.node, opts).replace(/\\/g, "\\\\");
-  if (/^\$!?{/.test(text)) return "\\" + text;
-  return text;
-};
-const printExact: PrintFn<AnyNode> = (path, opts) => read(path.node, opts);
+function printExact(path: AstPath<AnyNode>, opts: ParserOptions<AnyNode>) {
+  return read(path.node, opts);
+}
 
-const embedClass: EmbedFn = (toDoc, _print, path, opts) =>
-  toDoc(read(path.node, opts), exprParse);
-
-const embedImport: EmbedFn = (toDoc, _print, path, opts) =>
-  toDoc(read(path.node, opts), stmtParse);
-
-const embedExport: EmbedFn = (toDoc, _print, path, opts) =>
-  toDoc(read(path.node, opts), stmtParse);
-
-const embedStyle: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.Style;
-  const code = read(node.value, opts).trim();
-  const parser = getParserFromExt(
-    node.ext?.slice(node.ext.lastIndexOf(".")) || ".css",
-  );
-
-  if (parser) {
-    return b.group([
-      `style${node.ext || ""} {`,
-      b.indent([b.line, await toDoc(code, { parser })]),
-      b.line,
-      "}",
-    ]);
-  }
-};
-
-const embedStatic: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.Static;
-  const code = opts
-    ._markoParsed!.code.slice(node.start + node.target.length + 1, node.end)
-    .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
-    .trim();
-  return code
-    ? [`${node.target} `, withBlockIfNeeded(await toDoc(code, stmtParse))]
-    : [];
-};
-
-const embedScriptlet: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.Scriptlet;
-  const code = read(node.value, opts)
-    .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
-    .trim();
-  return code
-    ? [b.breakParent, "$ ", withBlockIfNeeded(await toDoc(code, stmtParse))]
-    : [];
-};
-
-const embedOpenTagName: EmbedFn = async (toDoc, _print, path, opts) =>
-  embedTemplate(toDoc, _print, path, opts);
-
-const embedPlaceholder: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.Placeholder;
-  const code = read(node.value, opts);
-
-  if (code === '" "' || code === "' '") {
-    return getVisibleSpace(opts);
-  }
-
-  return b.group([
-    node.escape ? "${" : "$!{",
-    b.indent([b.softline, await toDoc(code, exprParse)]),
-    b.softline,
-    "}",
-  ]);
-};
-
-const embedTagArgs: EmbedFn = (toDoc, _print, path, opts) => {
-  return argsToDoc(path.node as Node.TagArgs, opts, toDoc);
-};
-
-const embedAttrNamed: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.AttrNamed;
-  const name = read(node.name, opts);
-  if (!(node.args || node.value)) return name;
-  const attrDoc: Doc[] = [name];
-
-  if (node.args) {
-    const argsDoc = await argsToDoc(node.args, opts, toDoc);
-    if (argsDoc) {
-      attrDoc.push(argsDoc);
-    } else {
-      return unexpectedDoc(opts, node);
-    }
-  }
-
-  if (node.value) {
-    if (node.value.type === NodeType.AttrMethod) {
-      const attrMethodDoc = await toDoc(
-        `function${read(node.value, opts)}`,
-        exprParse,
-      );
-
-      if (
-        Array.isArray(attrMethodDoc) &&
-        attrMethodDoc.length &&
-        typeof attrMethodDoc[0] === "string"
-      ) {
-        attrMethodDoc[0] = (attrMethodDoc[0] as string).replace(
-          /^function\s*/,
-          "",
-        );
-        attrDoc.push(attrMethodDoc);
-      } else {
-        return unexpectedDoc(opts, node);
-      }
-    } else {
-      attrDoc.push(
-        node.value.bound ? ":=" : "=",
-        withParensIfNeeded(
-          await toDoc(read(node.value.value, opts), exprParse),
-          isConcise(opts),
-        ),
-      );
-    }
-  }
-  return b.group(attrDoc);
-};
-
-const embedAttrSpread: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.AttrSpread;
-  return b.group([
-    "...",
-    withParensIfNeeded(
-      await toDoc(read(node.value, opts), exprParse),
-      isConcise(opts),
-    ),
-  ]);
-};
-
-const embedShorthandId: EmbedFn = async (toDoc, print, path, opts) => [
-  "#",
-  (await embedTemplate(toDoc, print, path, opts))!,
-];
-
-const embedShorthandClassName: EmbedFn = async (toDoc, print, path, opts) => [
-  ".",
-  (await embedTemplate(toDoc, print, path, opts))!,
-];
-
-const embedTag = (path: AstPath<Node.Tag>, opts: Options): EmbedFn | null => {
-  const tag = path.node;
-  const parser = getTagParser(tag, opts);
-  if (parser === undefined) return null;
-  return async (toDoc, print, path, opts) =>
-    printTag(path, opts as ParserOptions<Node.AnyNode>, print, {
-      inline: true,
-      preserve: parser === false,
-      content: await getFormattedBody(path, parser, toDoc, print, opts),
-    });
-};
-
-const embedTagVar: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.TagVar;
-  const code = read(node.value, opts).trim();
-  if (code) {
-    let doc = await toDoc(`var ${code}=_`, stmtParse);
-
-    if (Array.isArray(doc) && doc.length === 1) {
-      doc = doc[0];
-    }
-
-    if (
-      typeof doc === "object" &&
-      !Array.isArray(doc) &&
-      doc.type === "group"
-    ) {
-      doc = doc.contents;
-    }
-    if (Array.isArray(doc) && doc.length > 1) {
-      const varPart = doc[1];
-      if (
-        typeof varPart === "object" &&
-        "type" in varPart &&
-        varPart.type === "group" &&
-        Array.isArray(varPart.contents)
-      ) {
-        const varContents = varPart.contents;
-        for (let i = varContents.length; i--; ) {
-          const item = varContents[i];
-          if (typeof item === "string") {
-            // Walks back until we find the equals sign.
-            const match = /\s*=\s*$/.exec(item);
-            if (match) {
-              varContents[i] = item.slice(0, -match[0].length);
-              varContents.length = i + 1;
-              return ["/", varContents];
-            }
-          }
-        }
-      }
-    }
-
-    return unexpectedDoc(opts, node);
-  }
-
-  return [];
-};
-
-const embedTagTypeArgs: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.TagTypeArgs;
-  const code = read(node.value, opts).trim();
-  if (code) {
-    const doc = await toDoc(`_<${code}>`, exprParse);
-    if (typeof doc === "string") {
-      return doc.replace(/^_/, "");
-    }
-
-    if (Array.isArray(doc) && typeof doc[0] === "string") {
-      doc[0] = doc[0].replace(/^_/, "");
-      return doc;
-    }
-
-    return unexpectedDoc(opts, node);
-  }
-
-  return [];
-};
-
-const embedTagParams: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.TagParams;
-  const code = read(node.value, opts).trim();
-  if (code) {
-    const doc = await toDoc(`function _(${code}){}`, stmtParse);
-    if (Array.isArray(doc) && doc.length > 1) {
-      const paramsGroup = doc[1];
-      if (
-        paramsGroup &&
-        typeof paramsGroup === "object" &&
-        "type" in paramsGroup &&
-        paramsGroup.type === "group" &&
-        Array.isArray(paramsGroup.contents)
-      ) {
-        const paramsContents = [...paramsGroup.contents];
-        const first = paramsContents[0];
-        const last = paramsContents[paramsContents.length - 1];
-        if (typeof first === "string" && typeof last === "string") {
-          paramsContents[0] = first.replace(/^\(/, "|");
-          paramsContents[paramsContents.length - 1] = last.replace(/\)$/, "|");
-        }
-
-        return b.group(paramsContents);
-      }
-    }
-    return unexpectedDoc(opts, node);
-  }
-
-  return [];
-};
-
-const embedTagTypeParams: EmbedFn = async (toDoc, _print, path, opts) => {
-  const node = path.node as Node.TagTypeArgs;
-  const code = read(node.value, opts).trim();
-  if (code) {
-    const doc = await toDoc(`function _<${code}>(){}`, stmtParse);
-    if (Array.isArray(doc) && doc.length > 1) {
-      return doc[1];
-    }
-    return unexpectedDoc(opts, node);
-  }
-
-  return [];
-};
-
-const embedTemplate: EmbedFn = async (toDoc, _print, path, opts) => {
-  const { expressions, quasis } = path.node as
-    | Node.ShorthandId
-    | Node.ShorthandClassName
-    | Node.OpenTagName;
+async function templateToDoc(
+  toDoc: ToDocFn,
+  path: AstPath<Node.ShorthandId | Node.ShorthandClassName | Node.OpenTagName>,
+  opts: Options,
+) {
+  const { expressions, quasis } = path.node;
   const first = read(quasis[0], opts);
   const len = expressions.length;
   if (!len) return first;
@@ -954,12 +910,12 @@ const embedTemplate: EmbedFn = async (toDoc, _print, path, opts) => {
   }
 
   return shorthandDoc;
-};
+}
 
 async function argsToDoc(
   node: Node.TagArgs | Node.AttrArgs,
   opts: Options,
-  toDoc: (text: string, options: Options) => Promise<Doc>,
+  toDoc: ToDocFn,
 ) {
   const code = read(node.value, opts).trim();
   if (code) {
