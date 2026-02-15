@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.0.6
+
+### Patch Changes
+
+- [#102](https://github.com/marko-js/prettier/pull/102) [`828a883`](https://github.com/marko-js/prettier/commit/828a8830b7a143573c79a44bbd39eddff0c3f3ad) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve stripping of empty tag param, args, type params and type args.
+
 ## 4.0.5
 
 ### Patch Changes
