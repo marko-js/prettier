@@ -50,6 +50,12 @@ export enum NodeType {
   Static,
 }
 
+export enum CommentType {
+  line,
+  block,
+  html,
+}
+
 export namespace Node {
   export type AnyNode =
     | Program
@@ -103,8 +109,7 @@ export namespace Node {
   export interface Program extends Range {
     type: NodeType.Program;
     parent: undefined;
-    static: StaticNode[];
-    body: ChildNode[];
+    body: (ChildNode | StaticNode)[];
   }
 
   export interface Tag extends Range {
@@ -216,7 +221,7 @@ export namespace Node {
   export interface Comment extends Ranges.Value {
     type: NodeType.Comment;
     parent: ParentNode;
-    block: boolean;
+    commentType: CommentType;
   }
 
   export interface Placeholder extends Ranges.Value {
@@ -301,9 +306,9 @@ export namespace Node {
 export function parse(code: string, filename = "index.marko") {
   const builder = new Builder(code);
   const parser = createParser(builder);
+  const { program } = builder;
 
   parser.parse(code);
-  const program = builder.end();
   return {
     read: parser.read,
     locationAt: parser.locationAt,
@@ -315,8 +320,8 @@ export function parse(code: string, filename = "index.marko") {
 }
 
 class Builder {
+  public program: Node.Program;
   #code: string;
-  #program: Node.Program;
   #openTagStart: Range | undefined;
   #parentNode: Node.ParentNode;
   #staticNode: Node.StaticNode | undefined;
@@ -324,18 +329,13 @@ class Builder {
 
   constructor(code: string) {
     this.#code = code;
-    this.#program = this.#parentNode = {
+    this.program = this.#parentNode = {
       type: NodeType.Program,
       parent: undefined,
-      static: [],
       body: [],
       start: 0,
       end: code.length,
     };
-  }
-
-  end() {
-    return this.#program;
   }
 
   onText(range: Range) {
@@ -374,10 +374,19 @@ class Builder {
     });
   }
   onComment(range: Ranges.Value) {
+    let commentType: CommentType = CommentType.html;
+    switch (this.#code.charCodeAt(range.start + 1)) {
+      case 47: // /
+        commentType = CommentType.line;
+        break;
+      case 42: // *
+        commentType = CommentType.block;
+        break;
+    }
     pushBody(this.#parentNode, {
       type: NodeType.Comment,
       parent: this.#parentNode,
-      block: this.#code.charAt(range.start + 1) !== "/",
+      commentType,
       value: range.value,
       start: range.start,
       end: range.end,
@@ -428,10 +437,10 @@ class Builder {
 
           if (styleBlockMatch) {
             const [{ length }, ext] = styleBlockMatch;
-            this.#program.static.push(
+            this.program.body.push(
               (this.#staticNode = {
                 type: NodeType.Style,
-                parent: this.#program,
+                parent: this.program,
                 ext: ext || undefined,
                 value: {
                   start: range.end + length,
@@ -441,7 +450,6 @@ class Builder {
                 end: UNFINISHED,
               }),
             );
-
             return TagType.statement;
           } else {
             bodyType = TagType.text;
@@ -449,10 +457,10 @@ class Builder {
           }
         }
         case "class":
-          this.#program.static.push(
+          this.program.body.push(
             (this.#staticNode = {
               type: NodeType.Class,
-              parent: this.#program,
+              parent: this.program,
               start: range.start,
               end: UNFINISHED,
             }),
@@ -460,10 +468,10 @@ class Builder {
 
           return TagType.statement;
         case "export":
-          this.#program.static.push(
+          this.program.body.push(
             (this.#staticNode = {
               type: NodeType.Export,
-              parent: this.#program,
+              parent: this.program,
               start: range.start,
               end: UNFINISHED,
             }),
@@ -471,10 +479,10 @@ class Builder {
 
           return TagType.statement;
         case "import":
-          this.#program.static.push(
+          this.program.body.push(
             (this.#staticNode = {
               type: NodeType.Import,
-              parent: this.#program,
+              parent: this.program,
               start: range.start,
               end: UNFINISHED,
             }),
@@ -484,10 +492,10 @@ class Builder {
         case "server":
         case "client":
         case "static":
-          this.#program.static.push(
+          this.program.body.push(
             (this.#staticNode = {
               type: NodeType.Static,
-              parent: this.#program,
+              parent: this.program,
               target: nameText,
               start: range.start,
               end: UNFINISHED,
@@ -813,7 +821,7 @@ function hasCloseTag(
  * When control flow is the parent of an attribute tag, we add the attribute tag to
  * the closest non control flow ancestor attrs instead.
  */
-function isControlFlowTag(node: Node.Tag): node is Node.ControlFlowTag {
+export function isControlFlowTag(node: Node.Tag): node is Node.ControlFlowTag {
   switch (node.nameText) {
     case "if":
     case "else":
