@@ -11,6 +11,7 @@ import {
 } from "prettier";
 
 import {
+  CommentType,
   type Node,
   NodeType,
   parse as parseMarko,
@@ -97,10 +98,7 @@ const tagVisitorKeys = [
 const visitorKeys = {
   [NodeType.Tag]: tagVisitorKeys,
   [NodeType.AttrTag]: tagVisitorKeys,
-  [NodeType.Program]: [
-    "static",
-    "body",
-  ] as const satisfies (keyof Node.Program)[],
+  [NodeType.Program]: ["body"] as const satisfies (keyof Node.Program)[],
   [NodeType.AttrNamed]: [
     "args",
     "value",
@@ -225,7 +223,7 @@ const printHandlers: PrintHandlers = {
   [NodeType.Comment]: (path, opts) => {
     const { node } = path;
     const code = read(node, opts);
-    if (node.block) {
+    if (node.commentType !== CommentType.line) {
       if (code.includes("\n")) {
         const lines = code.split("\n");
         const len = lines.length;
@@ -259,24 +257,14 @@ const printHandlers: PrintHandlers = {
     `<?${read(path.node.value, opts).trim()}?>`,
   [NodeType.Program]: (path, opts, print) => {
     const body = printBody(path, opts, print);
-    const lastStatic = path.node.static.length - (body ? 0 : 1);
-    let programDoc = path.map(
-      (child, i) =>
-        i !== lastStatic && hasExplicitLine(child, opts)
-          ? [child.call(print), b.hardline]
-          : child.call(print),
-      "static",
-    );
+    if (!body) return [b.hardline];
 
-    if (body) {
-      if (body.inline) {
-        programDoc.push(wrapConciseText(body.content));
-      } else {
-        programDoc = [...programDoc, ...body.content];
-      }
-    }
-
-    return [b.join(b.hardline, programDoc), b.hardline];
+    return [
+      body.inline
+        ? wrapConciseText(body.content)
+        : b.join(b.hardline, body.content),
+      b.hardline,
+    ];
   },
   [NodeType.Text]: (path, opts) => {
     const text = read(path.node, opts).replace(/\\/g, "\\\\");
@@ -717,11 +705,17 @@ function printBody(
   let inlineIndex = -1;
 
   if (preserve) {
+    let inlineChild = false;
     path.each((child) => {
       const childDoc = child.call(print);
+      inlineChild =
+        isInline(child.node) ||
+        (inlineChild &&
+          child.node.type === NodeType.Comment &&
+          child.node.commentType !== CommentType.line);
       content ||= [];
 
-      if (isInline(child.node)) {
+      if (inlineChild) {
         if (!inline) {
           inline = [];
           inlineIndex = content.push(inline) - 1;
@@ -767,11 +761,11 @@ function printBody(
       ensureVisibleTrailingSpace(inline, opts);
     }
   } else {
+    let inlineChild = false;
     let isInlineTag = false;
     let isExplicitLine = false;
     path.each((child) => {
       const wasInlineTag = isInlineTag;
-      const inlineChild = isInline(child.node);
       let childDoc = child.call(print);
       if (child.node.type === NodeType.Text && typeof childDoc === "string") {
         childDoc = trimText(childDoc, child as AstPath<Node.Text>);
@@ -779,8 +773,13 @@ function printBody(
 
       if (!childDoc) return;
 
-      isInlineTag = false;
       content ||= [];
+      isInlineTag = false;
+      inlineChild =
+        isInline(child.node) ||
+        (inlineChild &&
+          child.node.type === NodeType.Comment &&
+          child.node.commentType !== CommentType.line);
 
       if (isExplicitLine) {
         const last = content.length - 1;
@@ -1008,8 +1007,6 @@ function isTextLike(node: AnyNode): node is Node.Text | Node.Placeholder {
     case NodeType.Text:
     case NodeType.Placeholder:
       return true;
-    case NodeType.Comment:
-      return node.block;
     default:
       return false;
   }
@@ -1017,13 +1014,11 @@ function isTextLike(node: AnyNode): node is Node.Text | Node.Placeholder {
 
 function isInlineHTML(
   node: AnyNode,
-): node is Node.Text | Node.Placeholder | Node.Comment | Node.Tag {
+): node is Node.Text | Node.Placeholder | Node.Tag {
   switch (node.type) {
     case NodeType.Text:
     case NodeType.Placeholder:
       return true;
-    case NodeType.Comment:
-      return node.block;
     case NodeType.Tag:
       return (
         !!node.nameText &&
