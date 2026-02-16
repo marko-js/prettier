@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.0.7
+
+### Patch Changes
+
+- [#108](https://github.com/marko-js/prettier/pull/108) [`afedf85`](https://github.com/marko-js/prettier/commit/afedf85b974de3206b1324337ad34fadcfb27d8a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with scriptlets being considered safe to avoid wrapping with brackets even when it was not.
+
 ## 4.0.6
 
 ### Patch Changes
