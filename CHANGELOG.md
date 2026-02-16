@@ -1,5 +1,13 @@
 # prettier-plugin-marko
 
+## 4.0.8
+
+### Patch Changes
+
+- [#110](https://github.com/marko-js/prettier/pull/110) [`7a031a3`](https://github.com/marko-js/prettier/commit/7a031a3fb4f2ea233d2729495774422beaf81694) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Preserve static block locations.
+
+- [#110](https://github.com/marko-js/prettier/pull/110) [`7a031a3`](https://github.com/marko-js/prettier/commit/7a031a3fb4f2ea233d2729495774422beaf81694) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Only consider a comment inline text if it was preceded by inline text.
+
 ## 4.0.7
 
 ### Patch Changes
