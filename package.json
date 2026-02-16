@@ -44,7 +44,7 @@
     "test:update": "npm test -- --update"
   },
   "dependencies": {
-    "htmljs-parser": "^5.9.0"
+    "htmljs-parser": "^5.10.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",
