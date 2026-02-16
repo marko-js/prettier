@@ -26,14 +26,17 @@ import {
 } from "./utils/get-parser-name";
 import { read } from "./utils/read";
 import {
+  toValidAttrValue,
+  toValidScriptlet,
+  toValidStatement,
+} from "./utils/to-valid-doc";
+import {
   ensureVisibleSpace,
   ensureVisibleSpaceBetweenTags,
   ensureVisibleTrailingSpace,
   getVisibleSpace,
   isVisibleSpace,
 } from "./utils/visible-space";
-import withBlockIfNeeded from "./utils/with-block-if-needed";
-import withParensIfNeeded from "./utils/with-parens-if-needed";
 
 declare module "prettier" {
   interface Options {
@@ -315,7 +318,7 @@ const embedHandlers: EmbedHandlers = {
       .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
       .trim();
     return code
-      ? [`${node.target} `, withBlockIfNeeded(await toDoc(code, stmtParse))]
+      ? [`${node.target} `, toValidStatement(await toDoc(code, stmtParse))]
       : [];
   },
 
@@ -324,7 +327,7 @@ const embedHandlers: EmbedHandlers = {
       .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
       .trim();
     return code
-      ? [b.breakParent, "$ ", withBlockIfNeeded(await toDoc(code, stmtParse))]
+      ? [b.breakParent, "$ ", toValidScriptlet(await toDoc(code, stmtParse))]
       : [];
   },
 
@@ -389,7 +392,7 @@ const embedHandlers: EmbedHandlers = {
       } else {
         attrDoc.push(
           node.value.bound ? ":=" : "=",
-          withParensIfNeeded(
+          toValidAttrValue(
             await toDoc(read(node.value.value, opts), exprParse),
             isConcise(opts),
           ),
@@ -402,7 +405,7 @@ const embedHandlers: EmbedHandlers = {
   [NodeType.AttrSpread]: async (toDoc, _print, path, opts) => {
     return b.group([
       "...",
-      withParensIfNeeded(
+      toValidAttrValue(
         await toDoc(read(path.node.value, opts), exprParse),
         isConcise(opts),
       ),

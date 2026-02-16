@@ -38,7 +38,11 @@ export default function printDoc(doc: Doc): string {
               cached = printDoc(doc.flatContents) + printDoc(doc.breakContents);
               break;
             case "indent-if-break":
-              cached = " ";
+              // The types for ident-if-break are wrong.
+              cached =
+                " " +
+                printDoc((doc as any).contents) +
+                printDoc((doc as any).negate);
               break;
             case "label":
             case "line-suffix":
