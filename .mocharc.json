@@ -1,6 +1,0 @@
-{
-  "extension": ["ts"],
-  "enable-source-maps": true,
-  "watchFiles": ["src/**/*.ts"],
-  "require": ["tsx", "mocha-snap"]
-}

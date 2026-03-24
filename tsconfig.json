@@ -1,6 +1,7 @@
 {
   "include": ["src/**/*"],
   "compilerOptions": {
+    "types": ["vitest/globals"],
     "lib": ["ESNext"],
     "rootDir": "src",
     "strict": true,

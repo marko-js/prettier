@@ -1,8 +1,0 @@
-{
-  "all": true,
-  "include": ["src/**/*"],
-  "reporter": ["text", "lcov"],
-  "extension": [".ts"],
-  "exclude": ["**/__tests__", "**/*.d.ts"],
-  "parserPlugins": ["typescript"]
-}

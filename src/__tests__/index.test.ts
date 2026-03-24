@@ -1,15 +1,12 @@
-import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 
 import * as compiler from "@marko/compiler";
-import snapshot from "mocha-snap";
 import { format, type Options } from "prettier";
 
 import * as plugin from "..";
 
-const cwd = process.cwd();
-const fixtures = path.relative(cwd, path.join(__dirname, "fixtures"));
+const fixtures = path.join(import.meta.dirname, "fixtures");
 const { traverseFast } = compiler.types;
 const skip = (traverseFast as any).skip as symbol;
 const compileOpts: compiler.Config = {
@@ -37,55 +34,37 @@ for (const entry of fs.readdirSync(fixtures)) {
     let source: string;
     let text: string;
 
-    before(() => {
+    beforeAll(() => {
       source = fs.readFileSync(filepath, "utf-8");
       text = getCompiledText(filepath, source);
     });
 
-    it("auto", formatWith({}));
-    it("html", formatWith({ markoSyntax: "html" }));
-    it("concise", formatWith({ markoSyntax: "concise" }));
+    testFormat("auto", {});
+    testFormat("html", { markoSyntax: "html" });
+    testFormat("concise", { markoSyntax: "concise" });
 
-    function formatWith(opts: Partial<Options>) {
-      return async () => {
-        let err: unknown;
-        await snapshot(
-          async () => {
-            const fullOpts = {
-              filepath,
-              parser: "marko",
-              plugins: [plugin],
-              ...opts,
-            };
+    function testFormat(name: string, opts: Partial<Options>) {
+      it(name, async () => {
+        const fullOpts = {
+          filepath,
+          parser: "marko",
+          plugins: [plugin],
+          ...opts,
+        };
 
-            const formatted = await format(source, fullOpts);
-            const reformatted = await format(formatted, {
-              ...fullOpts,
-              filepath: undefined,
-            });
-            try {
-              assert.equal(
-                reformatted,
-                formatted,
-                `${filepath}: Expected reformatting to be idempotent.`,
-              );
+        const formatted = await format(source, fullOpts);
+        const reformatted = await format(formatted, {
+          ...fullOpts,
+          filepath: undefined,
+        });
 
-              assert.equal(
-                getCompiledText(filepath, formatted),
-                text,
-                `${filepath}: Formatting should not alter the compiled text.`,
-              );
-            } catch (e) {
-              err = e;
-            }
-
-            return reformatted;
-          },
-          { dir, ext: ".marko" },
+        await expect(reformatted).toMatchFileSnapshot(
+          path.join(dir, "__snapshots__", `${name}.expected.marko`),
         );
 
-        if (err) throw err;
-      };
+        expect(reformatted).toBe(formatted);
+        expect(getCompiledText(filepath, formatted)).toBe(text);
+      });
     }
   });
 }
@@ -124,7 +103,7 @@ function getCompiledText(filepath: string, source: string) {
 
 describe("singleQuote mode", () => {
   it("prints with single quotes", async () => {
-    const filepath = path.join(fixtures, "whitespace/template.marko"); // use existing fixture.
+    const filepath = path.join(fixtures, "whitespace/template.marko");
     const source = fs.readFileSync(filepath, "utf-8");
     const formatted = (
       await format(source, {
@@ -140,6 +119,6 @@ describe("singleQuote mode", () => {
       plugins: [plugin],
       singleQuote: true,
     });
-    assert.equal(reformatted, formatted);
+    expect(reformatted).toBe(formatted);
   });
 });
