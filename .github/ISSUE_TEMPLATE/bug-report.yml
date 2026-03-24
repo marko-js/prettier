@@ -1,0 +1,27 @@
+name: Bug Report
+description: Something isn't working right
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`npm ls prettier-plugin-marko`"
+      placeholder: "0.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal code or steps to reproduce.
+      render: marko
+    validations:
+      required: true
