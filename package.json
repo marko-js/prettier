@@ -33,15 +33,15 @@
     "@ci:build": "npm run build",
     "@ci:lint": "eslint . && prettier . --check --log-level=warn",
     "@ci:release": "npm run build && changeset publish && npm ci",
-    "@ci:test": "c8 npm test -- --forbid-pending --forbid-only",
+    "@ci:test": "vitest run --coverage --no-color",
     "@ci:version": "npm run build && npm run format && changeset version && npm i --package-lock-only",
     "build": "tsc -b && rolldown -c",
     "change": "changeset add",
     "format": "eslint --fix .; prettier . --write --log-level=warn",
     "prepare": "husky",
     "report": "open ./coverage/lcov-report/index.html",
-    "test": "cross-env NODE_ENV=test mocha 'src/**/__tests__/*.test.ts'",
-    "test:update": "npm test -- --update"
+    "test": "vitest run",
+    "test:update": "vitest run --update"
   },
   "dependencies": {
     "htmljs-parser": "^5.10.0"
@@ -51,10 +51,8 @@
     "@changesets/cli": "^2.29.8",
     "@eslint/js": "^10.0.1",
     "@marko/compiler": "^5.39.55",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^25.2.3",
-    "c8": "^10.1.3",
-    "cross-env": "^10.1.0",
+    "@vitest/coverage-v8": "^3.1.4",
     "eslint": "^10.0.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "fast-glob": "^3.3.3",
@@ -62,13 +60,11 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "marko": "^6.0.145",
-    "mocha": "^11.7.5",
-    "mocha-snap": "^5.0.1",
     "prettier": "^3.8.1",
     "prettier-plugin-packagejson": "^3.0.0",
     "rolldown": "^1.0.0-rc.4",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.55.1-alpha.4"
+    "typescript-eslint": "^8.55.1-alpha.4",
+    "vitest": "^3.1.4"
   }
 }
