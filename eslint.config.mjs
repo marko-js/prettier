@@ -6,22 +6,15 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   {
-    ignores: [
-      ".nyc_output",
-      ".vscode*",
-      "**/__snapshots__",
-      "**/*dist/",
-      "coverage",
-      "node_modules",
-    ],
+    ignores: [".vscode", "coverage", "dist", "**/__snapshots__"],
   },
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
     languageOptions: {
       globals: {
-        ...globals.mocha,
         ...globals.node,
+        ...globals.vitest,
       },
     },
     plugins: {
