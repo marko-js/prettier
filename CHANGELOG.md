@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.0.9
+
+### Patch Changes
+
+- [#115](https://github.com/marko-js/prettier/pull/115) [`4739f68`](https://github.com/marko-js/prettier/commit/4739f68125ef59cf6625cbf5b713ddcc342156c3) Thanks [@LuLaValva](https://github.com/LuLaValva)! - Wrap tag param types with pipes in parentheses
+
 ## 4.0.8
 
 ### Patch Changes
