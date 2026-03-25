@@ -61,7 +61,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-packagejson": "^3.0.2",
     "rolldown": "^1.0.0-rc.11",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.57.2",
     "vitest": "^4.1.1"
   }
