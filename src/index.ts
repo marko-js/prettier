@@ -80,6 +80,8 @@ type Body = ReturnType<typeof printBody>;
 
 const b = doc.builders;
 const traverseDoc = doc.utils.traverseDoc;
+const findInDoc = doc.utils.findInDoc;
+const mapDoc = doc.utils.mapDoc;
 const stmtParse = { parser: "babel-ts" } satisfies Options;
 const exprParse = { parser: "__ts_expression" } satisfies Options;
 const noVisitorKeys = [] as const;
@@ -500,12 +502,15 @@ const embedHandlers: EmbedHandlers = {
         paramsGroup.type === "group" &&
         Array.isArray(paramsGroup.contents)
       ) {
-        const paramsContents = [...paramsGroup.contents];
+        let paramsContents = [...paramsGroup.contents];
         const first = paramsContents[0];
         const last = paramsContents[paramsContents.length - 1];
         if (typeof first === "string" && typeof last === "string") {
           paramsContents[0] = first.replace(/^\(/, "|");
           paramsContents[paramsContents.length - 1] = last.replace(/\)$/, "|");
+        }
+        if (docContainsPipe(paramsContents.slice(1, -1))) {
+          paramsContents = wrapPipedTypesInParens(paramsContents) as Doc[];
         }
 
         return b.group(paramsContents);
@@ -1100,6 +1105,41 @@ function pathHas<T extends AnyNode, K extends keyof T>(
   key: K,
 ): path is AstPath<T & { [Key in K]: NonNullable<T[K]> }> {
   return !!path.node[key];
+}
+
+function docContainsPipe(doc: Doc): boolean {
+  return !!findInDoc(
+    doc,
+    (child: Doc) => {
+      if (typeof child === "string" && child.includes("|")) return true;
+    },
+    false,
+  );
+}
+
+function wrapPipedTypesInParens(doc: Doc): Doc {
+  return mapDoc(doc, (node: Doc) => {
+    if (Array.isArray(node)) {
+      let changed = false;
+      const result = [...node];
+      for (let i = 1; i < result.length; i++) {
+        const prev = result[i - 1];
+        const cur = result[i];
+        if (typeof cur === "string" || !docContainsPipe(cur)) continue;
+        if (
+          // Match "name: " as a single merged string before the type
+          (typeof prev === "string" && prev.endsWith(": ")) ||
+          // Match ":" " " as separate strings before the type
+          (i >= 2 && result[i - 2] === ":" && prev === " ")
+        ) {
+          result[i] = b.group(["(", cur, b.softline, ")"]);
+          changed = true;
+        }
+      }
+      return changed ? result : node;
+    }
+    return node;
+  });
 }
 
 /* c8 ignore start */
