@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.0.10
+
+### Patch Changes
+
+- [#131](https://github.com/marko-js/prettier/pull/131) [`4b9f3ab`](https://github.com/marko-js/prettier/commit/4b9f3ab5bb1a6de3e61fc94d7078c6d4ca05a1e6) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Require htmljs-parser ^5.12.1, which fixes attribute-value trailing line comments being treated as self-enclosed and leaking past the tag.
+
 ## 4.0.9
 
 ### Patch Changes
