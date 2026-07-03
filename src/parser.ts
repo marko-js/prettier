@@ -93,7 +93,7 @@ export namespace Node {
   export type AttrNode = AttrNamed | AttrSpread;
   export type ControlFlowTag = Tag & {
     nameText: "if" | "else" | "else-if" | "for" | "while";
-    bodyType: TagType.html;
+    bodyType: typeof TagType.html;
   };
   export type ChildNode =
     | Tag
@@ -122,7 +122,7 @@ export namespace Node {
     open: Range;
     close: Range | undefined;
     nameText: string | undefined;
-    bodyType: Exclude<TagType, "statement">;
+    bodyType: Exclude<TagType, typeof TagType.statement>;
     name: OpenTagName;
     var: TagVar | undefined;
     args: TagArgs | undefined;
@@ -145,7 +145,7 @@ export namespace Node {
     open: Range;
     close: Range | undefined;
     nameText: string;
-    bodyType: TagType.html;
+    bodyType: typeof TagType.html;
     name: OpenTagName;
     var: TagVar | undefined;
     args: TagArgs | undefined;
@@ -419,7 +419,7 @@ class Builder {
     let concise = true;
     let start = range.start;
     let type = NodeType.Tag;
-    let bodyType = TagType.html;
+    let bodyType: TagType = TagType.html;
     let nameText: string | undefined = undefined;
 
     if (this.#openTagStart) {

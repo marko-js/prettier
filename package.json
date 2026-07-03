@@ -43,26 +43,26 @@
     "test:update": "vitest run --update"
   },
   "dependencies": {
-    "htmljs-parser": "^5.10.2"
+    "htmljs-parser": "^5.12.1"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.6.0",
-    "@changesets/cli": "^2.30.0",
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
-    "@marko/compiler": "^5.39.62",
-    "@types/node": "^25.6.0",
-    "@vitest/coverage-v8": "^4.1.4",
-    "eslint": "^10.2.0",
+    "@marko/compiler": "^5.40.0",
+    "@types/node": "^26.1.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.6.0",
     "eslint-plugin-simple-import-sort": "^13.0.0",
-    "globals": "^17.5.0",
+    "globals": "^17.7.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "marko": "^6.0.160",
-    "prettier": "^3.8.2",
+    "lint-staged": "^17.0.8",
+    "marko": "^6.2.1",
+    "prettier": "^3.9.4",
     "prettier-plugin-packagejson": "^3.0.2",
-    "rolldown": "^1.0.0-rc.15",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "rolldown": "^1.1.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vitest": "^4.1.9"
   }
 }
