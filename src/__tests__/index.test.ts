@@ -8,7 +8,12 @@ import * as plugin from "..";
 
 const fixtures = path.join(import.meta.dirname, "fixtures");
 const { traverseFast } = compiler.types;
-const skip = (traverseFast as any).skip as symbol;
+// `traverseFast.skip` is a `unique symbol`, but the `@marko/compiler` re-export
+// widens it to `symbol`; recover the precise type from the visitor signature.
+const skip = traverseFast.skip as Exclude<
+  ReturnType<Parameters<typeof traverseFast>[1]>,
+  void
+>;
 const compileOpts: compiler.Config = {
   output: "source",
   ast: true,

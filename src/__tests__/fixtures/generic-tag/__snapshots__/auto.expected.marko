@@ -39,9 +39,9 @@
 <my-tag <
   T extends
     keyof (typeof SuperLongImportedVariableName)["member1"]["member2"]["member3"],
-  K extends T extends string
+  K extends (T extends string
     ? MyType["member1"]["member2"]["member3"]
-    : MyOtherType,
+    : MyOtherType),
 >|x|/>
 <my-tag<{
   foo: number;

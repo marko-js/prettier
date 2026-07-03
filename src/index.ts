@@ -447,7 +447,7 @@ const embedHandlers: EmbedHandlers = {
         Array.isArray(varPart.contents)
       ) {
         const varContents = varPart.contents;
-        for (let i = varContents.length; i--; ) {
+        for (let i = varContents.length; i--;) {
           const item = varContents[i];
           if (typeof item === "string") {
             // Walks back until we find the equals sign.
@@ -969,7 +969,7 @@ function trimText(text: string, path: AstPath<Node.Text>) {
   let prev: Node.ChildNode | undefined;
   let next: Node.ChildNode | undefined;
 
-  for (let i = path.index!; --i >= 0; ) {
+  for (let i = path.index!; --i >= 0;) {
     const sibling = siblings[i];
     if (
       sibling.type !== NodeType.Scriptlet &&
@@ -980,7 +980,7 @@ function trimText(text: string, path: AstPath<Node.Text>) {
     }
   }
 
-  for (let i = path.index!; ++i < siblings.length; ) {
+  for (let i = path.index!; ++i < siblings.length;) {
     const sibling = siblings[i];
     if (
       sibling.type !== NodeType.Scriptlet &&
