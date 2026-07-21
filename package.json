@@ -29,11 +29,11 @@
     "!**/*.tsbuildinfo"
   ],
   "scripts": {
-    "@ci:build": "npm run build",
+    "@ci:build": "pnpm run build",
     "@ci:lint": "eslint . && prettier . --check --log-level=warn",
-    "@ci:release": "npm run build && changeset publish && npm ci",
+    "@ci:release": "pnpm run build && changeset publish && pnpm install --frozen-lockfile",
     "@ci:test": "vitest run --coverage --no-color",
-    "@ci:version": "npm run build && npm run format && changeset version && npm i --package-lock-only",
+    "@ci:version": "pnpm run build && pnpm run format && changeset version && pnpm install --lockfile-only",
     "build": "tsc -b && rolldown -c",
     "change": "changeset add",
     "format": "eslint --fix .; prettier . --write --log-level=warn",
@@ -64,5 +64,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.1",
     "vitest": "^4.1.9"
-  }
+  },
+  "packageManager": "pnpm@11.15.1"
 }

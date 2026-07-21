@@ -16,17 +16,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
       - name: Install node
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
       - name: Install packages (node@${{ steps.node.outputs.node-version }})
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Run build
-        run: npm run @ci:build
+        run: pnpm run @ci:build
       - name: Run lint
-        run: npm run @ci:lint
+        run: pnpm run @ci:lint
   test:
     runs-on: ${{ matrix.os }}
     name: "test: node ${{ matrix.node }} on ${{ matrix.os }}"
@@ -38,18 +40,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # standalone pnpm bundles its own Node runtime, so pnpm itself
+          # works even when the matrix Node is older than pnpm requires
+          standalone: true
       - name: Install node
         id: node
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          cache: pnpm
       - name: Install packages (node@${{ steps.node.outputs.node-version }})
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Run tests
-        run: npm run @ci:test
+        run: pnpm run @ci:test
       - name: Report coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: marko-js/prettier
@@ -64,19 +72,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
       - name: Install node
         id: node
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
       - name: Install packages (node@${{ steps.node.outputs.node-version }})
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Run release
         uses: changesets/action@v1
         with:
-          version: npm run @ci:version
-          publish: npm run @ci:release
+          version: pnpm run @ci:version
+          publish: pnpm run @ci:release
           commit: "[ci] release"
           title: "[ci] release"
         env:
