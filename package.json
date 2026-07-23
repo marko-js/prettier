@@ -65,5 +65,8 @@
     "typescript-eslint": "^8.62.1",
     "vitest": "^4.1.9"
   },
+  "peerDependencies": {
+    "prettier": "^3.0.0"
+  },
   "packageManager": "pnpm@11.15.1"
 }

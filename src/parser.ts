@@ -309,6 +309,28 @@ export function parse(code: string, filename = "index.marko") {
   const { program } = builder;
 
   parser.parse(code);
+
+  // `htmljs-parser` reports syntax errors through `onError` and then stops parsing
+  // (`emitError` moves the cursor past the end of the input), so everything after the
+  // error is missing from `program`. Printing that truncated tree would silently delete
+  // the rest of the file, so surface the error the way every Prettier parser does.
+  if (builder.error) {
+    const { start, end, message } = builder.error;
+    const startPos = parser.positionAt(start);
+    const endPos = parser.positionAt(end);
+    throw Object.assign(
+      new SyntaxError(
+        `${message} (${startPos.line + 1}:${startPos.character + 1})`,
+      ),
+      {
+        loc: {
+          start: { line: startPos.line + 1, column: startPos.character + 1 },
+          end: { line: endPos.line + 1, column: endPos.character + 1 },
+        },
+      },
+    );
+  }
+
   return {
     read: parser.read,
     locationAt: parser.locationAt,
@@ -321,6 +343,8 @@ export function parse(code: string, filename = "index.marko") {
 
 class Builder {
   public program: Node.Program;
+  /** First syntax error reported by the parser, if any. See `parse`. */
+  public error: Ranges.Error | undefined;
   #code: string;
   #openTagStart: Range | undefined;
   #parentNode: Node.ParentNode;
@@ -336,6 +360,12 @@ class Builder {
       start: 0,
       end: code.length,
     };
+  }
+
+  onError(data: Ranges.Error) {
+    // Keep the first error: it is the one that stopped the parse, so later
+    // errors are reported against an already-truncated document.
+    this.error ??= data;
   }
 
   onText(range: Range) {
