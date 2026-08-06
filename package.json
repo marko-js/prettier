@@ -43,7 +43,7 @@
     "test:update": "vitest run --update"
   },
   "dependencies": {
-    "htmljs-parser": "^5.12.1"
+    "@marko/parse": "link:../language-server/packages/parse"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",
