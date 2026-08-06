@@ -3,7 +3,7 @@ import {
   isValidScriptlet,
   isValidStatement,
   Validity,
-} from "htmljs-parser";
+} from "@marko/parse";
 import { type Doc, doc as d } from "prettier";
 
 import printDoc from "./print-doc";

@@ -1,6 +1,6 @@
+import { type Node, NodeType } from "@marko/parse";
 import { type AstPath, type Doc, doc, type Options } from "prettier";
 
-import { type Node, NodeType } from "../parser";
 import { read } from "./read";
 const placeholderReg = /MARKO_(\d+)_/g;
 const { mapDoc } = doc.utils;

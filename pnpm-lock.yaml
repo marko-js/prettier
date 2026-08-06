@@ -8,9 +8,9 @@ importers:
 
   .:
     dependencies:
-      htmljs-parser:
-        specifier: ^5.12.1
-        version: 5.12.1
+      '@marko/parse':
+        specifier: link:../language-server/packages/parse
+        version: link:../language-server/packages/parse
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^0.7.0
