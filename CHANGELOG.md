@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.1.0
+
+### Minor Changes
+
+- [#141](https://github.com/marko-js/prettier/pull/141) [`9bf9eeb`](https://github.com/marko-js/prettier/commit/9bf9eeb834876f3b6accaee5b3067c7480f8ff08) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Print the `async` shorthand method modifier, eg `<button async onClick() { await save() }>`.
+
 ## 4.0.10
 
 ### Patch Changes
