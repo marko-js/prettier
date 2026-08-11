@@ -43,7 +43,7 @@
     "test:update": "vitest run --update"
   },
   "dependencies": {
-    "htmljs-parser": "^5.12.1"
+    "htmljs-parser": "^5.14.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",
