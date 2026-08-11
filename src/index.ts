@@ -347,7 +347,12 @@ const embedHandlers: EmbedHandlers = {
     const { node } = path;
     const name = read(node.name, opts);
     if (!(node.args || node.value)) return name;
-    const attrDoc: Doc[] = [name];
+    // A default attribute method is printed flush against the tag name, so an
+    // `async` before it has to bring its own leading space.
+    const attrDoc: Doc[] =
+      node.value?.type === NodeType.AttrMethod && node.value.async
+        ? [isDefaultAttr(node) ? " async " : "async ", name]
+        : [name];
 
     if (node.args && !isEmpty(node.args.value, opts)) {
       const argsDoc = await argsToDoc(node.args, opts, toDoc);
@@ -362,8 +367,12 @@ const embedHandlers: EmbedHandlers = {
 
     if (node.value) {
       if (node.value.type === NodeType.AttrMethod) {
+        // Rebuilt from the type params since the keyword prints before the
+        // name, but kept here or an `await` in the body fails to parse.
+        const { async, typeParams, params, end } = node.value;
+        const source = read({ start: (typeParams ?? params).start, end }, opts);
         const attrMethodDoc = await toDoc(
-          `function${read(node.value, opts)}`,
+          `${async ? "async " : ""}function${source}`,
           exprParse,
         );
 
@@ -372,7 +381,10 @@ const embedHandlers: EmbedHandlers = {
           attrMethodDoc.length &&
           typeof attrMethodDoc[0] === "string"
         ) {
-          attrMethodDoc[0] = attrMethodDoc[0].replace(/^function\s*/, "");
+          attrMethodDoc[0] = attrMethodDoc[0].replace(
+            /^(?:async\s+)?function\s*/,
+            "",
+          );
           attrDoc.push(attrMethodDoc);
           /* c8 ignore start */
         } else {

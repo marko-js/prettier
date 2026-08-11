@@ -1,0 +1,15 @@
+button async onClick() {
+  await save();
+} -- x
+
+button async onClick<T extends Event>(event: T) {
+  await save(event);
+} -- x
+
+custom-tag async (value) {
+  await save(value);
+}
+
+custom-tag async (value) {
+  await save(value);
+}
