@@ -1,0 +1,12 @@
+---
+type: bug
+impact: high
+effort: med
+site: src/utils/to-valid-doc.ts › toValidAttrValue
+---
+
+# Keep the parentheses around an attribute value that ends in a postfix `!`
+
+`toValidAttrValue` asks htmljs-parser's `isValidAttrValue(code, concise)` whether the printed value has to be wrapped, and that check parses the bare expression to EOF without the `>` terminator, so a value ending in a TypeScript non-null `!` answers `Validity.enclosed` and the function returns the doc untouched, never building the `b.ifBreak("(")` group. htmljs-parser cannot parse that value unparenthesised (`lookBehindForOperator` in its `src/states/EXPRESSION.ts` treats char 33 as a pending operator, so `<const/tenant=input.tenant!>` runs past the `>` and the CompileError lands on the following tag), which makes the parentheses load-bearing rather than cosmetic: `--write` rewrites `<const/tenant=(input.tenant!)>` to `<const/tenant=input.tenant!>`, the template stops compiling, and `--check` then reports the broken file as already formatted. Dropping redundant parentheses is otherwise wanted, and `<div disabled=(1 > 2)>` in the same run keeps its own because that value validates as `invalid`, so the fix is narrow: treat a printed value whose last non-whitespace character is `!` as needing the group. Handing the checker the terminator is not enough on its own, since `isValidAttrValue("input.tenant!>", false)` is also `enclosed`, and a guard keyed on `Validity.valid` would miss the case entirely. No fixture under `src/__tests__/fixtures` puts a postfix `!` at the end of an attribute value, so one belongs with the fix.
+
+Check: `pnpm run build && printf '<const/tenant=(input.tenant!)>\n<const/item=(list[0]!)>\n<div disabled=(1 > 2)>x</div>\n' > /tmp/x.marko && pnpm exec prettier --no-config --plugin ./dist/index.mjs --parser marko /tmp/x.marko` prints `<const/tenant=input.tenant!>`, `<const/item=list[0]!>` and an unchanged `<div disabled=(1 > 2)>x</div>`; compiling that output with `@marko/compiler` at `output: "html"` fails with `Unexpected token, expected "</>/<=/>="` pointing at the next line, while the parenthesised input compiles. Root cause: `node -e 'const {isValidAttrValue,Validity}=require("htmljs-parser");console.log(Validity,isValidAttrValue("input.tenant!",false),isValidAttrValue("input.tenant!>",false),isValidAttrValue("1 > 2",false))'` prints `{ enclosed: 2, invalid: 0, valid: 1 } 2 2 0`.
