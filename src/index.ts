@@ -309,10 +309,8 @@ const embedHandlers: EmbedHandlers = {
 
   [NodeType.Static]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    // `target` is the keyword when parsed natively; a statement forced via
-    // `getTagType` has no `target` and carries its keyword in `name`.
-    const target = node.target ?? read(node.name!, opts);
-    const keywordEnd = node.name?.end ?? node.start + target.length;
+    const target = node.target ?? read(node.name, opts);
+    const keywordEnd = node.name.end;
     const code = opts
       ._markoParsed!.code.slice(keywordEnd, node.end)
       .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
