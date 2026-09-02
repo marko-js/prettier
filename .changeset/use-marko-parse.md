@@ -1,5 +1,5 @@
 ---
-"prettier-plugin-marko": minor
+"prettier-plugin-marko": patch
 ---
 
-Use the new shared `@marko/parse` package for parsing instead of a vendored syntax tree builder.
+Parse templates with the shared `@marko/parse` package instead of a vendored syntax tree builder; `htmljs-parser` is no longer a direct dependency.

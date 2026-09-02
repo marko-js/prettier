@@ -152,9 +152,10 @@ export const parsers: Record<string, Parser<AnyNode>> = {
     parse(text, opts) {
       const { program } = (opts._markoParsed = parseMarko(text, opts.filepath));
 
-      // Comments are printed as part of the body; prettier core registers
-      // anything on the root's `comments` and would throw in its
-      // ensureAllCommentsPrinted check since we print them ourselves.
+      // Comments are printed as part of the body. Prettier core copies the
+      // root's `comments` into its own list before `attachComments` deletes
+      // the property, and `ensureAllCommentsPrinted` then throws for every
+      // entry we did not print through its comment machinery.
       program.comments = undefined;
 
       if (opts.markoSyntax === "auto") {
@@ -308,9 +309,12 @@ const embedHandlers: EmbedHandlers = {
 
   [NodeType.Static]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    const target = node.target || "static";
+    // `target` is the keyword when parsed natively; a statement forced via
+    // `getTagType` has no `target` and carries its keyword in `name`.
+    const target = node.target ?? read(node.name!, opts);
+    const keywordEnd = node.name?.end ?? node.start + target.length;
     const code = opts
-      ._markoParsed!.code.slice(node.start + target.length + 1, node.end)
+      ._markoParsed!.code.slice(keywordEnd, node.end)
       .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
       .trim();
     return code
