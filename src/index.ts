@@ -1,4 +1,13 @@
 import {
+  CommentType,
+  type Node,
+  NodeType,
+  parse as parseMarko,
+  type Parsed,
+  type Range,
+  TagType,
+} from "@marko/parse";
+import {
   type AstPath,
   type Doc,
   doc,
@@ -10,15 +19,6 @@ import {
   type SupportOptions,
 } from "prettier";
 
-import {
-  CommentType,
-  type Node,
-  NodeType,
-  parse as parseMarko,
-  type Parsed,
-  type Range,
-  TagType,
-} from "./parser";
 import { getFormattedBody } from "./utils/get-formatted-body";
 import {
   getParserFromExt,
@@ -151,6 +151,12 @@ export const parsers: Record<string, Parser<AnyNode>> = {
     astFormat: "marko-ast",
     parse(text, opts) {
       const { program } = (opts._markoParsed = parseMarko(text, opts.filepath));
+
+      // Comments are printed as part of the body. Prettier core copies the
+      // root's `comments` into its own list before `attachComments` deletes
+      // the property, and `ensureAllCommentsPrinted` then throws for every
+      // entry we did not print through its comment machinery.
+      program.comments = undefined;
 
       if (opts.markoSyntax === "auto") {
         opts.markoSyntax = "html";
@@ -303,12 +309,14 @@ const embedHandlers: EmbedHandlers = {
 
   [NodeType.Static]: async (toDoc, _print, path, opts) => {
     const { node } = path;
+    const target = node.target ?? read(node.name, opts);
+    const keywordEnd = node.name.end;
     const code = opts
-      ._markoParsed!.code.slice(node.start + node.target.length + 1, node.end)
+      ._markoParsed!.code.slice(keywordEnd, node.end)
       .replace(/^\s*\{([\s\S]*)\}\s*$/, "$1")
       .trim();
     return code
-      ? [`${node.target} `, toValidStatement(await toDoc(code, stmtParse))]
+      ? [`${target} `, toValidStatement(await toDoc(code, stmtParse))]
       : [];
   },
 

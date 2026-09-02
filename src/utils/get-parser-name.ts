@@ -1,6 +1,6 @@
+import { type Node, NodeType } from "@marko/parse";
 import type { Options } from "prettier";
 
-import { type Node, NodeType } from "../parser";
 import { read } from "./read";
 
 export function getParserFromExt(ext: string) {
