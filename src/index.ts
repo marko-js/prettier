@@ -201,7 +201,11 @@ export const printers: Record<string, Printer<AnyNode>> = {
 const printHandlers: PrintHandlers = {
   [NodeType.AttrArgs]: printExact,
   [NodeType.AttrMethod]: printExact,
-  [NodeType.AttrNamed]: printExact,
+  [NodeType.AttrNamed]: (path, opts) => {
+    const { node } = path;
+    const exact = read(node, opts);
+    return isDefaultAsyncAttrMethod(node) ? [" ", exact] : exact;
+  },
   [NodeType.AttrSpread]: printExact,
   [NodeType.Class]: printExact,
   [NodeType.Export]: printExact,
@@ -349,10 +353,9 @@ const embedHandlers: EmbedHandlers = {
     if (!(node.args || node.value)) return name;
     // A default attribute method is printed flush against the tag name, so an
     // `async` before it has to bring its own leading space.
-    const attrDoc: Doc[] =
-      node.value?.type === NodeType.AttrMethod && node.value.async
-        ? [isDefaultAttr(node) ? " async " : "async ", name]
-        : [name];
+    const attrDoc: Doc[] = isAsyncAttrMethod(node)
+      ? [isDefaultAttr(node) ? " async " : "async ", name]
+      : [name];
 
     if (node.args && !isEmpty(node.args.value, opts)) {
       const argsDoc = await argsToDoc(node.args, opts, toDoc);
@@ -1063,6 +1066,18 @@ function hasPreservedText(node: Node.ParentNode) {
   }
 
   return false;
+}
+
+function isAsyncAttrMethod(node: AnyNode) {
+  return (
+    node.type === NodeType.AttrNamed &&
+    node.value?.type === NodeType.AttrMethod &&
+    node.value.async
+  );
+}
+
+function isDefaultAsyncAttrMethod(node: AnyNode) {
+  return isAsyncAttrMethod(node) && isDefaultAttr(node);
 }
 
 function isDefaultAttr(

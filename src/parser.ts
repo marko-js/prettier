@@ -739,6 +739,7 @@ class Builder {
   }
   onAttrMethod(range: Ranges.AttrMethod) {
     const parent = this.#attrNode!;
+    if (range.async) parent.start = range.start;
     parent.value = {
       type: NodeType.AttrMethod,
       parent,

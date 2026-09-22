@@ -3,6 +3,7 @@ import path from "node:path";
 
 import * as compiler from "@marko/compiler";
 import { format, type Options } from "prettier";
+import { format as formatWithoutParsers } from "prettier/standalone";
 
 import * as plugin from "..";
 
@@ -105,6 +106,30 @@ function getCompiledText(filepath: string, source: string) {
 
   return text.replace(/\s+/g, " ");
 }
+
+describe("without an embedded js parser", () => {
+  for (const fixture of ["attr-method-async", "attr-default-method"]) {
+    it(fixture, async () => {
+      const dir = path.join(fixtures, fixture);
+      const filepath = path.join(dir, "template.marko");
+      const source = fs.readFileSync(filepath, "utf-8");
+      const formatted = await formatStandalone(source, filepath);
+
+      await expect(formatted).toMatchFileSnapshot(
+        path.join(dir, "__snapshots__", "no-js-parser.expected.marko"),
+      );
+      expect(await formatStandalone(formatted, filepath)).toBe(formatted);
+    });
+  }
+
+  function formatStandalone(source: string, filepath: string) {
+    return formatWithoutParsers(source, {
+      filepath,
+      parser: "marko",
+      plugins: [plugin],
+    });
+  }
+});
 
 describe("singleQuote mode", () => {
   it("prints with single quotes", async () => {
