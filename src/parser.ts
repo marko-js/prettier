@@ -1,4 +1,11 @@
-import { createParser, type Range, type Ranges, TagType } from "htmljs-parser";
+import {
+  createParser,
+  getLines,
+  getLocation,
+  type Range,
+  type Ranges,
+  TagType,
+} from "htmljs-parser";
 
 const styleBlockReg = /((?:\.[^\s\\/:*?"<>|({]+)*)\s*\{/y;
 
@@ -339,6 +346,27 @@ class Builder {
     };
   }
 
+  // htmljs-parser stops at its first error, leaving the tree with only
+  // what came before it. Printing that would rewrite the file without the
+  // rest, so the error goes to prettier instead: a 1-based `loc` is what
+  // it prints a code frame from.
+  onError(data: Ranges.Error) {
+    const { start, end } = getLocation(
+      getLines(this.#code),
+      data.start,
+      data.end,
+    );
+    const loc = {
+      start: { line: start.line + 1, column: start.character + 1 },
+      end: { line: end.line + 1, column: end.character + 1 },
+    };
+    throw Object.assign(
+      new SyntaxError(
+        `${data.message} (${loc.start.line}:${loc.start.column})`,
+      ),
+      { loc },
+    );
+  }
   onText(range: Range) {
     pushBody(this.#parentNode, {
       type: NodeType.Text,

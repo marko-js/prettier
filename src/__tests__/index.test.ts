@@ -74,6 +74,44 @@ for (const entry of fs.readdirSync(fixtures)) {
   });
 }
 
+describe("unparseable template", () => {
+  // The parser stops at its first error, so the tree it built is only the
+  // file up to there; formatting has to fail rather than print that.
+  const cases: [name: string, source: string, message: string, line: number][] =
+    [
+      [
+        "mismatched closing tag",
+        "<div>\n  <span>hello\n</div>\n",
+        'The closing "div" tag does not match the corresponding opening "span" tag',
+        3,
+      ],
+      [
+        "unparenthesized > in an attribute value",
+        '<button>\n  <icon agent=items.length > 1 ? "a" : "b"/>\n</button>\n<ul>\n  <li>kept</li>\n</ul>\n',
+        'The closing "button" tag does not match the corresponding opening "icon" tag',
+        3,
+      ],
+      [
+        "unexpected closing tag",
+        "<div/>\n</span>\n",
+        'The closing "span" tag was not expected',
+        2,
+      ],
+    ];
+
+  for (const [name, source, message, line] of cases) {
+    it(`rejects ${name}`, async () => {
+      await expect(
+        format(source, { parser: "marko", plugins: [plugin] }),
+      ).rejects.toMatchObject({
+        name: "SyntaxError",
+        message: expect.stringContaining(message),
+        loc: { start: { line, column: 1 } },
+      });
+    });
+  }
+});
+
 function getCompiledText(filepath: string, source: string) {
   let text = "";
   traverseFast(
