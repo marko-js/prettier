@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.1.2
+
+### Patch Changes
+
+- [#151](https://github.com/marko-js/prettier/pull/151) [`221d8ac`](https://github.com/marko-js/prettier/commit/221d8ac0377a07f0076011f93263a20c06d55164) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Stop doubling every backslash in text content on each format. Only a backslash run that borders a placeholder is escaped now, so text like `C:\Users` or `\d+` keeps its backslashes and formatting it again is a no-op.
+
 ## 4.1.1
 
 ### Patch Changes
