@@ -1,3 +1,4 @@
+import { escapeText } from "htmljs-parser";
 import {
   type AstPath,
   type Doc,
@@ -298,10 +299,8 @@ const printHandlers: PrintHandlers = {
       b.hardline,
     ];
   },
-  [NodeType.Text]: (path, opts) => {
-    const text = read(path.node, opts).replace(/\\/g, "\\\\");
-    return /^\$!?{/.test(text) ? "\\" + text : text;
-  },
+  [NodeType.Text]: (path, opts) =>
+    escapeText(read(path.node, opts), readNextContent(path, opts)),
 };
 
 const embedHandlers: EmbedHandlers = {
@@ -356,12 +355,11 @@ const embedHandlers: EmbedHandlers = {
 
   [NodeType.Placeholder]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    const code = read(node.value, opts);
-
-    if (code === '" "' || code === "' '") {
+    if (isVisibleSpacePlaceholder(node, opts)) {
       return getVisibleSpace(opts);
     }
 
+    const code = read(node.value, opts);
     return b.group([
       node.escape ? "${" : "$!{",
       b.indent([b.softline, await toDoc(code, exprParse)]),
@@ -1047,6 +1045,28 @@ function trimText(text: string, path: AstPath<Node.Text>) {
   }
 
   return trimmed.replace(/\s+/g, " ");
+}
+
+function readNextContent(path: AstPath<Node.Text>, opts: Options) {
+  const next = path.next as AnyNode | null;
+  switch (next?.type) {
+    case NodeType.Placeholder:
+      // Outside preserved text a visible space prints as a line, and
+      // ensureVisibleSpace escapes before it where it stays a placeholder.
+      return isVisibleSpacePlaceholder(next, opts) &&
+        !hasPreservedText(path.node.parent)
+        ? ""
+        : read(next, opts);
+    case NodeType.Text:
+      return read(next, opts);
+    default:
+      return "";
+  }
+}
+
+function isVisibleSpacePlaceholder(node: Node.Placeholder, opts: Options) {
+  const code = read(node.value, opts);
+  return code === '" "' || code === "' '";
 }
 
 function isTextLike(node: AnyNode): node is Node.Text | Node.Placeholder {
