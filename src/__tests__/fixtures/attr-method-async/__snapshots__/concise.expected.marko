@@ -13,3 +13,20 @@ custom-tag async (value) {
 custom-tag async (value) {
   await save(value);
 }
+
+custom-tag async <T>(value: T) {
+  await save(value);
+}
+
+button async on-click() {
+  await save();
+} -- x
+
+button async onClick() {
+  await save();
+} -- x
+
+custom-tag
+  @item async on-select(value) {
+    await save(value);
+  }

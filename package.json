@@ -30,40 +30,38 @@
   ],
   "scripts": {
     "@ci:build": "pnpm run build",
-    "@ci:lint": "eslint . && prettier . --check --log-level=warn",
+    "@ci:lint": "oxlint && prettier . --check --log-level=warn",
     "@ci:release": "pnpm run build && changeset publish && pnpm install --frozen-lockfile",
     "@ci:test": "vitest run --coverage --no-color",
     "@ci:version": "pnpm run build && pnpm run format && changeset version && pnpm install --lockfile-only",
     "build": "tsc -b && rolldown -c",
     "change": "changeset add",
-    "format": "eslint --fix .; prettier . --write --log-level=warn",
+    "format": "oxlint --fix; prettier . --write --log-level=warn",
     "prepare": "husky",
     "report": "open ./coverage/lcov-report/index.html",
     "test": "vitest run",
     "test:update": "vitest run --update"
   },
   "dependencies": {
-    "htmljs-parser": "^5.14.0"
+    "htmljs-parser": "^5.15.1"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.7.0",
-    "@changesets/cli": "^2.31.0",
-    "@eslint/js": "^10.0.1",
-    "@marko/compiler": "^5.40.0",
-    "@types/node": "^26.1.0",
-    "@vitest/coverage-v8": "^4.1.9",
-    "eslint": "^10.6.0",
-    "eslint-plugin-simple-import-sort": "^13.0.0",
-    "globals": "^17.7.0",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@marko/compiler": "^5.42.5",
+    "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "^5.0.1",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.8",
-    "marko": "^6.2.1",
-    "prettier": "^3.9.4",
+    "lint-staged": "^17.5.1",
+    "marko": "^6.3.52",
+    "marko-5": "npm:marko@^5.39.41",
+    "oxlint": "^1.85.0",
+    "prettier": "^3.9.8",
     "prettier-plugin-packagejson": "^3.0.2",
-    "rolldown": "^1.1.4",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.1",
-    "vitest": "^4.1.9"
+    "rolldown": "^1.2.9",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@11.15.1"
 }

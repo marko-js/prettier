@@ -28,6 +28,7 @@ import {
 import { read } from "./utils/read";
 import {
   toValidAttrValue,
+  toValidExactAttrValue,
   toValidScriptlet,
   toValidStatement,
 } from "./utils/to-valid-doc";
@@ -201,8 +202,37 @@ export const printers: Record<string, Printer<AnyNode>> = {
 const printHandlers: PrintHandlers = {
   [NodeType.AttrArgs]: printExact,
   [NodeType.AttrMethod]: printExact,
-  [NodeType.AttrNamed]: printExact,
-  [NodeType.AttrSpread]: printExact,
+  // The attr handlers are reached when the embed fails, eg no JS parser is
+  // loaded, and print from source.
+  [NodeType.AttrNamed]: (path, opts) => {
+    const { node } = path;
+    const { value } = node;
+    if (value?.type === NodeType.AttrValue) {
+      return [
+        read({ start: node.start, end: value.value.start }, opts),
+        toValidExactAttrValue(read(value.value, opts), isConcise(opts)),
+      ];
+    }
+
+    if (value?.type === NodeType.AttrMethod && value.async) {
+      // The keyword is printed rather than copied, since the whitespace after
+      // it may be a newline, which would end a concise attr.
+      const isDefault = isDefaultAttr(node);
+      const { start } = isDefault
+        ? (value.typeParams ?? value.params)
+        : node.name;
+      return [
+        isDefault ? " async " : "async ",
+        read({ start, end: node.end }, opts),
+      ];
+    }
+
+    return read(node, opts);
+  },
+  [NodeType.AttrSpread]: (path, opts) => [
+    "...",
+    toValidExactAttrValue(read(path.node.value, opts), isConcise(opts)),
+  ],
   [NodeType.Class]: printExact,
   [NodeType.Export]: printExact,
   [NodeType.Import]: printExact,

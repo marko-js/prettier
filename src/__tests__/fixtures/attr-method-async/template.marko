@@ -9,3 +9,19 @@
 
 <custom-tag async(value) {await save(value)
 }/>
+
+<custom-tag async<T>(value: T) {await save(value)
+}/>
+
+<button async on-click() {await save()
+}>x</button>
+
+<button
+  async
+    onClick() {await save()
+}>x</button>
+
+<custom-tag>
+  <@item async on-select(value) {await save(value)
+  }/>
+</custom-tag>

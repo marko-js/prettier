@@ -1,4 +1,6 @@
-# htmljs-parser is first-party: the release-age gate guards against a
+# Marko's packages are first-party: the release-age gate guards against a
 # compromised third-party publish, which is not the threat model here.
 minimumReleaseAgeExclude:
   - htmljs-parser
+  - marko
+  - "@marko/*"
