@@ -1,5 +1,13 @@
 # prettier-plugin-marko
 
+## 4.1.3
+
+### Patch Changes
+
+- [#154](https://github.com/marko-js/prettier/pull/154) [`d0ef393`](https://github.com/marko-js/prettier/commit/d0ef3937532e3add2e34dc4da53c61351312b558) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Keep comments inside an open tag, which were deleted before. A comment stays in its place among the tag's attrs, on its own line or after the part it followed. A line comment that has to share its line with more of the tag is printed as a block comment, and a comma is printed after a value that a comment follows, which would otherwise read the comment as part of it.
+
+- [#153](https://github.com/marko-js/prettier/pull/153) [`da5a821`](https://github.com/marko-js/prettier/commit/da5a821bd9bd04dac7dd0af35df305bdb0058aab) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Move a line comment that ends a tag var into a block comment (`<let/count // total` becomes `<let/count /* total */`), since a line comment there swallowed the rest of the open tag and a tag var cannot be parenthesized.
+
 ## 4.1.2
 
 ### Patch Changes
