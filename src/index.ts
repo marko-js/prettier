@@ -9,6 +9,7 @@ import {
   type Printer,
   type SupportLanguage,
   type SupportOptions,
+  util,
 } from "prettier";
 
 import {
@@ -28,6 +29,7 @@ import {
 } from "./utils/get-parser-name";
 import { read } from "./utils/read";
 import {
+  toBlockComment,
   toValidAttrValue,
   toValidExactAttrValue,
   toValidScriptlet,
@@ -84,6 +86,7 @@ const b = doc.builders;
 const traverseDoc = doc.utils.traverseDoc;
 const findInDoc = doc.utils.findInDoc;
 const mapDoc = doc.utils.mapDoc;
+const hasNewline = util.hasNewline;
 const stmtParse = { parser: "babel-ts" } satisfies Options;
 const exprParse = { parser: "__ts_expression" } satisfies Options;
 const noVisitorKeys = [] as const;
@@ -254,35 +257,10 @@ const printHandlers: PrintHandlers = {
   [NodeType.CDATA]: (path, opts) =>
     `<![CDATA[${read(path.node.value, opts)}]]>`,
   [NodeType.Comment]: (path, opts) => {
-    const { node } = path;
-    const code = read(node, opts);
-    if (node.commentType !== CommentType.line) {
-      if (code.includes("\n")) {
-        const lines = code.split("\n");
-        const len = lines.length;
-        let indent = Infinity;
-
-        for (let i = 1; i < len; i++) {
-          const match = lines[i].match(/^(\s+)/);
-          if (match) {
-            indent = Math.min(indent, match[1].length);
-          } else {
-            indent = 0;
-            break;
-          }
-        }
-
-        const parts: Doc[] = [lines[0]];
-        for (let i = 1; i < len; i++) {
-          parts.push(b.hardline, indent ? lines[i].slice(indent) : lines[i]);
-        }
-        return parts;
-      }
-
-      return code;
-    }
-
-    return b.lineSuffix(code);
+    const code = read(path.node, opts);
+    return path.node.commentType === CommentType.line
+      ? b.lineSuffix(code)
+      : printCommentLines(code);
   },
   [NodeType.Doctype]: (path, opts) =>
     `<!${read(path.node.value, opts).replace(/\s+/g, " ").trim()}>`,
@@ -599,30 +577,11 @@ function printHTMLTag(
   body: Body,
 ) {
   const { node } = path;
-  const openTagDoc: Doc[] = ["<", printTagBeforeAttrs(path, opts, print)];
-
-  if (node.attrs) {
-    const hasDefault = isDefaultAttr(node.attrs[0]);
-    let attrsDocs = path.map(print, "attrs");
-
-    if (hasDefault) {
-      openTagDoc.push(attrsDocs[0]);
-      attrsDocs = attrsDocs.slice(1);
-    }
-
-    if (attrsDocs.length) {
-      if (attrsDocs.length === 1 && !(hasDefault || node.params || node.args)) {
-        openTagDoc.push(" ", attrsDocs[0]);
-      } else {
-        openTagDoc.push(
-          b.indent([b.line, b.join(b.line, attrsDocs)]),
-          b.softline,
-        );
-      }
-    }
-  }
-
-  openTagDoc.push(body || node.bodyType === TagType.void ? ">" : "/>");
+  const openTagDoc: Doc[] = [
+    "<",
+    printOpenTag(path, opts, print).doc,
+    body || node.bodyType === TagType.void ? ">" : "/>",
+  ];
 
   if (body) {
     const bodyLine = body.inline ? b.softline : b.hardline;
@@ -651,35 +610,18 @@ function printConciseTag(
   print: PrintFn,
   body: Body,
 ) {
-  const { node } = path;
-  const tagDoc: Doc[] = [printTagBeforeAttrs(path, opts, print)];
-
-  if (node.attrs) {
-    const hasDefault = isDefaultAttr(node.attrs[0]);
-    let attrsDocs = path.map(print, "attrs");
-    if (hasDefault) {
-      tagDoc.push(attrsDocs[0]);
-      attrsDocs = attrsDocs.slice(1);
-    }
-    if (attrsDocs.length) {
-      if (attrsDocs.length === 1 && !(hasDefault || node.params || node.args)) {
-        tagDoc.push(" ", attrsDocs[0]);
-      } else {
-        const attrsDoc: Doc[] = [];
-        for (const attrDoc of attrsDocs) {
-          attrsDoc.push(b.line, b.ifBreak(","), attrDoc);
-        }
-        tagDoc.push(b.group(b.indent(attrsDoc)));
-      }
-    }
-  }
+  const openTag = printOpenTag(path, opts, print);
+  const tagDoc: Doc[] = [openTag.doc];
 
   if (body) {
     tagDoc.push(
       b.group(
         body.inline
-          ? body.preserve
-            ? b.indent([b.line, wrapConciseText(body.content)])
+          ? body.preserve || openTag.endsWithLineComment
+            ? b.indent([
+                openTag.endsWithLineComment ? b.hardline : b.line,
+                wrapConciseText(body.content),
+              ])
             : [" --", b.indent([b.line, body.content])]
           : b.indent([b.hardline, b.join(b.hardline, body.content)]),
       ),
@@ -689,14 +631,136 @@ function printConciseTag(
   return b.group(tagDoc);
 }
 
-function printTagBeforeAttrs(
+/**
+ * Prints the open tag without its delimiters, keeping each comment in place:
+ * after the part on its line, else on its own line, unless it ends a concise
+ * open tag, where a line of its own would start the body instead.
+ */
+function printOpenTag(
   path: AstPath<Node.Tag | Node.AttrTag>,
   opts: Options,
   print: PrintFn,
 ) {
   const { node } = path;
-  const name = path.call(print, "name");
-  const doc: Doc[] = [name];
+  const concise = isConcise(opts);
+  const comments = node.comments ?? [];
+  const hasDefault = !!node.attrs && isDefaultAttr(node.attrs[0]);
+  const headLine: OpenTagLine = {
+    doc: "",
+    value:
+      hasDefault ||
+      (!!node.var && (!node.params || isEmpty(node.params.value, opts))),
+    comments: [],
+  };
+  const lines: OpenTagLine[] = [];
+  let nextComment = 0;
+  const takeComments = (end: number) => {
+    const start = nextComment;
+    while (nextComment < comments.length && comments[nextComment].start < end) {
+      nextComment++;
+    }
+    return comments.slice(start, nextComment);
+  };
+  const addComments = (end: number) => {
+    for (const comment of takeComments(end)) {
+      if (
+        hasNewline(opts._markoParsed!.code, comment.start, { backwards: true })
+      ) {
+        lines.push({ comments: [comment] });
+      } else {
+        (lines.at(-1) ?? headLine).comments.push(comment);
+      }
+    }
+  };
+  const printLine = (
+    { doc, value, comments }: OpenTagLine,
+    next: OpenTagLine | undefined,
+  ) => {
+    const docs = comments.map((comment, i) =>
+      printOpenTagComment(comment, opts, i === comments.length - 1),
+    );
+    if (doc === undefined) return b.join(" ", docs);
+    // A comment after a value would be read as part of it, which in concise
+    // mode a newline prevents.
+    const comma =
+      value && (docs.length || (!concise && next && next.doc === undefined));
+    return [doc, comma ? "," : "", docs.map((commentDoc) => [" ", commentDoc])];
+  };
+  const doc: Doc[] = [
+    printOpenTagHead(path, opts, print, (part) => {
+      const docs = takeComments(part.start).map((comment) =>
+        printOpenTagComment(comment, opts, false),
+      );
+      return docs.length ? [" ", b.join(" ", docs), " "] : "";
+    }),
+  ];
+
+  if (pathHas(path, "attrs")) {
+    path.each((attrPath, i) => {
+      if (hasDefault && i === 0) return;
+      const attr = attrPath.node;
+      addComments(attr.start);
+      lines.push({
+        doc: print(attrPath),
+        value:
+          attr.type === NodeType.AttrSpread ||
+          attr.value?.type === NodeType.AttrValue,
+        comments: [],
+      });
+    }, "attrs");
+  }
+
+  addComments(Infinity);
+
+  if (concise) {
+    const lastAttr = lines.findLastIndex((line) => line.doc !== undefined);
+    const lastLine = lines[lastAttr] ?? headLine;
+    for (const line of lines.splice(lastAttr + 1)) {
+      lastLine.comments.push(...line.comments);
+    }
+  }
+
+  if (
+    lines.length === 1 &&
+    !(hasDefault || node.params || node.args || node.comments)
+  ) {
+    doc.push(" ", lines[0].doc!);
+  } else if (lines.length || headLine.comments.length) {
+    const attrsDoc = b.indent([
+      printLine(headLine, lines[0]),
+      lines.map((line, i) => [
+        concise && line.doc !== undefined ? [b.line, b.ifBreak(",")] : b.line,
+        printLine(line, lines[i + 1]),
+      ]),
+    ]);
+    doc.push(concise ? b.group(attrsDoc) : [attrsDoc, b.softline]);
+  }
+
+  return {
+    doc,
+    endsWithLineComment:
+      (lines.at(-1) ?? headLine).comments.at(-1)?.commentType ===
+      CommentType.line,
+  };
+}
+
+/** A line of the open tag, and the comments after its attr or head if any. */
+interface OpenTagLine {
+  doc?: Doc;
+  /** Whether the doc ends in a value, which reads a comment after it. */
+  value?: boolean;
+  comments: Node.Comment[];
+}
+
+/** Prints the parts of the open tag before its attrs, which have no spaces. */
+function printOpenTagHead(
+  path: AstPath<Node.Tag | Node.AttrTag>,
+  opts: Options,
+  print: PrintFn,
+  printCommentsBefore: (part: Range) => Doc,
+) {
+  const { node } = path;
+  const doc: Doc[] = [path.call(print, "name")];
 
   if (pathHas(path, "typeArgs") && !isEmpty(path.node.typeArgs.value, opts)) {
     doc.push(path.call(print, "typeArgs"));
@@ -711,11 +775,11 @@ function printTagBeforeAttrs(
   }
 
   if (pathHas(path, "args") && !isEmpty(path.node.args.value, opts)) {
-    doc.push(path.call(print, "args"));
+    doc.push(printCommentsBefore(path.node.args), path.call(print, "args"));
   }
 
   if (pathHas(path, "var")) {
-    doc.push(path.call(print, "var"));
+    doc.push(printCommentsBefore(path.node.var), path.call(print, "var"));
   }
 
   if (pathHas(path, "params") && !isEmpty(path.node.params.value, opts)) {
@@ -723,15 +787,22 @@ function printTagBeforeAttrs(
       pathHas(path, "typeParams") &&
       !isEmpty(path.node.typeParams.value, opts)
     ) {
-      if (!(node.typeArgs || node.args || node.var)) {
-        doc.push(" ");
-      }
-      doc.push(path.call(print, "typeParams"));
+      doc.push(
+        printCommentsBefore(path.node.typeParams) ||
+          (node.typeArgs || node.args || node.var ? "" : " "),
+        path.call(print, "typeParams"),
+      );
+    } else {
+      doc.push(printCommentsBefore(path.node.params));
     }
     doc.push(path.call(print, "params"));
   }
 
-  return doc.length === 1 ? name : doc;
+  if (node.attrs && isDefaultAttr(node.attrs[0])) {
+    doc.push(printCommentsBefore(node.attrs[0]), path.call(print, "attrs", 0));
+  }
+
+  return doc;
 }
 
 function printBody(
@@ -1127,6 +1198,45 @@ function isDefaultAttr(
   }
 
   return false;
+}
+
+function printOpenTagComment(
+  comment: Node.Comment,
+  opts: Options,
+  endsLine: boolean,
+): Doc {
+  if (comment.commentType !== CommentType.line) {
+    return printCommentLines(read(comment, opts));
+  }
+
+  return endsLine
+    ? [read(comment, opts), b.breakParent]
+    : toBlockComment(read(comment.value, opts));
+}
+
+/** Prints a comment with its lines indented as they were relative to each other. */
+function printCommentLines(code: string): Doc {
+  if (!code.includes("\n")) return code;
+
+  const lines = code.split("\n");
+  const len = lines.length;
+  let indent = Infinity;
+
+  for (let i = 1; i < len; i++) {
+    const match = lines[i].match(/^(\s+)/);
+    if (match) {
+      indent = Math.min(indent, match[1].length);
+    } else {
+      indent = 0;
+      break;
+    }
+  }
+
+  const parts: Doc[] = [lines[0]];
+  for (let i = 1; i < len; i++) {
+    parts.push(b.hardline, indent ? lines[i].slice(indent) : lines[i]);
+  }
+  return parts;
 }
 
 function isConcise(opts: Options) {

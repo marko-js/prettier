@@ -1,0 +1,40 @@
+<div /* layout wrapper */ class="card"/>
+
+<input
+  // Browsers autofill this field
+  name="email"
+  type="email"
+>
+
+<input
+  hidden // Revealed by the toggle below
+  type="text"
+>
+
+<section // Rendered on the server
+>
+  Content
+</section>
+
+<if /* feature flag */ =showBanner>
+  <aside/>
+</if>
+
+<for|item| /* in display order */ of=items>${item}</for>
+
+<canvas /* measured on mount */ /canvas/>
+
+<details
+  open
+  /* Collapses when
+  the route changes */
+/>
+
+<textarea
+  // Kept empty for the placeholder
+>Notes</textarea>
+
+<nav
+  hidden // Shown by the menu button
+  // Styled by the header
+/>

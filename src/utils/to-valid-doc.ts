@@ -39,6 +39,12 @@ export function toValidExactAttrValue(code: string, concise: boolean): Doc {
     : `(\n${code}\n)`;
 }
 
+// A line comment followed by more of the template would swallow it, so it is
+// printed as a block comment instead, which a `*/` in its text would end early.
+export function toBlockComment(text: string) {
+  return `/* ${text.trim().replaceAll("*/", "*\\/")} */`;
+}
+
 export function toValidScriptlet(doc: Doc) {
   return toValidBlock(doc, isValidScriptlet);
 }
