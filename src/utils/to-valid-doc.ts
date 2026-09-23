@@ -45,6 +45,28 @@ export function toBlockComment(text: string) {
   return `/* ${text.trim().replaceAll("*/", "*\\/")} */`;
 }
 
+// A trailing line comment, which htmljs-parser folds into a tag var, would
+// swallow the rest of the open tag, and a tag var cannot be parenthesized like
+// an attr value, so the comment is moved into a block comment after it.
+export function splitTagVarComment(code: string): [code: string, comment: Doc] {
+  // Text after a line comment is read as part of the value.
+  if (isValidAttrValue(`${code} _`, false) !== Validity.invalid) {
+    for (let i = code.indexOf("//"); i !== -1; i = code.indexOf("//", i + 2)) {
+      const value = code.slice(0, i).trimEnd();
+      if (
+        value &&
+        isValidAttrValue(value, false) !== Validity.invalid &&
+        isValidAttrValue(`${value} _`, false) === Validity.invalid
+      ) {
+        const text = code.slice(i + 2);
+        return [value, text.trim() ? [" ", toBlockComment(text)] : ""];
+      }
+    }
+  }
+
+  return [code, ""];
+}
+
 export function toValidScriptlet(doc: Doc) {
   return toValidBlock(doc, isValidScriptlet);
 }

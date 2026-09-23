@@ -29,6 +29,7 @@ import {
 } from "./utils/get-parser-name";
 import { read } from "./utils/read";
 import {
+  splitTagVarComment,
   toBlockComment,
   toValidAttrValue,
   toValidExactAttrValue,
@@ -251,7 +252,11 @@ const printHandlers: PrintHandlers = {
   [NodeType.TagParams]: printExact,
   [NodeType.TagTypeArgs]: printExact,
   [NodeType.TagTypeParams]: printExact,
-  [NodeType.TagVar]: printExact,
+  [NodeType.TagVar]: (path, opts) => {
+    const value = read(path.node.value, opts);
+    const [code, comment] = splitTagVarComment(value);
+    return code === value ? read(path.node, opts) : ["/", code, comment];
+  },
   [NodeType.Tag]: printTag,
   [NodeType.AttrTag]: printTag,
   [NodeType.CDATA]: (path, opts) =>
@@ -442,7 +447,7 @@ const embedHandlers: EmbedHandlers = {
 
   [NodeType.TagVar]: async (toDoc, _print, path, opts) => {
     const { node } = path;
-    const code = read(node.value, opts).trim();
+    const [code, comment] = splitTagVarComment(read(node.value, opts).trim());
     let doc = await toDoc(`var ${code}=_`, stmtParse);
 
     if (Array.isArray(doc) && doc.length === 1) {
@@ -473,7 +478,7 @@ const embedHandlers: EmbedHandlers = {
             if (match) {
               varContents[i] = item.slice(0, -match[0].length);
               varContents.length = i + 1;
-              return ["/", varContents];
+              return ["/", varContents, comment];
             }
           }
         }
@@ -687,11 +692,11 @@ function printOpenTag(
     return [doc, comma ? "," : "", docs.map((commentDoc) => [" ", commentDoc])];
   };
   const doc: Doc[] = [
-    printOpenTagHead(path, opts, print, (part) => {
+    printOpenTagHead(path, opts, print, (part, glued) => {
       const docs = takeComments(part.start).map((comment) =>
         printOpenTagComment(comment, opts, false),
       );
-      return docs.length ? [" ", b.join(" ", docs), " "] : "";
+      return docs.length ? [" ", b.join(" ", docs), glued ? "" : " "] : "";
     }),
   ];
 
@@ -757,7 +762,7 @@ function printOpenTagHead(
   path: AstPath<Node.Tag | Node.AttrTag>,
   opts: Options,
   print: PrintFn,
-  printCommentsBefore: (part: Range) => Doc,
+  printCommentsBefore: (part: Range, glued?: boolean) => Doc,
 ) {
   const { node } = path;
   const doc: Doc[] = [path.call(print, "name")];
@@ -799,7 +804,12 @@ function printOpenTagHead(
   }
 
   if (node.attrs && isDefaultAttr(node.attrs[0])) {
-    doc.push(printCommentsBefore(node.attrs[0]), path.call(print, "attrs", 0));
+    // Glued to the `=`, like the comments that end a tag var, which these join
+    // when one comes before them.
+    doc.push(
+      printCommentsBefore(node.attrs[0], true),
+      path.call(print, "attrs", 0),
+    );
   }
 
   return doc;
