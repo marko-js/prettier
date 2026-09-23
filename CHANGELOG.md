@@ -1,5 +1,13 @@
 # prettier-plugin-marko
 
+## 4.1.1
+
+### Patch Changes
+
+- [#150](https://github.com/marko-js/prettier/pull/150) [`81b16c8`](https://github.com/marko-js/prettier/commit/81b16c8ba9ca11124f4c788d2f83e28a640c2881) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Print code copied from source validly, which happens without a JS parser (`prettier/standalone`) or when the code fails to parse: shorthand methods keep their `async`, scriptlets keep their `$`, and an attribute value that ends in a line comment or spans lines is enclosed rather than swallowing or splitting the rest of the tag.
+
+- [#147](https://github.com/marko-js/prettier/pull/147) [`272ee0d`](https://github.com/marko-js/prettier/commit/272ee0dc951d44883cca4cebda4389cc1fd6de1c) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fail with the parser's syntax error instead of printing a template htmljs-parser could not parse. The parser stops at its first error, so formatting such a file used to print only the part before it and silently delete the rest.
+
 ## 4.1.0
 
 ### Minor Changes
