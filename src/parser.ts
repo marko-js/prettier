@@ -139,6 +139,7 @@ export namespace Node {
     typeArgs: TagTypeArgs | undefined;
     typeParams: TagTypeParams | undefined;
     attrs: Repeatable<AttrNode>;
+    comments: Repeatable<Comment>;
     body: Repeatable<ChildNode>;
   }
 
@@ -162,6 +163,7 @@ export namespace Node {
     typeArgs: TagTypeArgs | undefined;
     typeParams: TagTypeParams | undefined;
     attrs: Repeatable<AttrNode>;
+    comments: Repeatable<Comment>;
     body: Repeatable<ChildNode>;
   }
 
@@ -403,23 +405,16 @@ class Builder {
     });
   }
   onComment(range: Ranges.Value) {
-    let commentType: CommentType = CommentType.html;
-    switch (this.#code.charCodeAt(range.start + 1)) {
-      case 47: // /
-        commentType = CommentType.line;
-        break;
-      case 42: // *
-        commentType = CommentType.block;
-        break;
+    pushBody(this.#parentNode, this.#comment(this.#parentNode, range));
+  }
+  onOpenTagComment(range: Ranges.Value) {
+    const parent = this.#parentNode as Node.ParentTag;
+    const comment = this.#comment(parent, range);
+    if (parent.comments) {
+      parent.comments.push(comment);
+    } else {
+      parent.comments = [comment];
     }
-    pushBody(this.#parentNode, {
-      type: NodeType.Comment,
-      parent: this.#parentNode,
-      commentType,
-      value: range.value,
-      start: range.start,
-      end: range.end,
-    });
   }
   onPlaceholder(range: Ranges.Placeholder) {
     pushBody(this.#parentNode, {
@@ -604,6 +599,7 @@ class Builder {
           typeArgs: undefined,
           typeParams: undefined,
           attrs: undefined,
+          comments: undefined,
           bodyType,
           body: undefined,
           close: undefined,
@@ -821,6 +817,25 @@ class Builder {
     if (hasCloseTag(parent)) parent.close.end = range.end;
     parent.end = range.end;
     this.#parentNode = parent.parent;
+  }
+  #comment(parent: Node.ParentNode, range: Ranges.Value): Node.Comment {
+    let commentType: CommentType = CommentType.html;
+    switch (this.#code.charCodeAt(range.start + 1)) {
+      case 47: // /
+        commentType = CommentType.line;
+        break;
+      case 42: // *
+        commentType = CommentType.block;
+        break;
+    }
+    return {
+      type: NodeType.Comment,
+      parent,
+      commentType,
+      value: range.value,
+      start: range.start,
+      end: range.end,
+    };
   }
 }
 
