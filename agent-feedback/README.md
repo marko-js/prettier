@@ -61,6 +61,6 @@ For a defect in the printed output, the smallest reproduction is the input templ
 
 **Guard tests.** `vitest run`. Fixtures live under `src/__tests__/`; snapshots are updated with `pnpm test:update`. Prefer adding a case to an existing fixture suite over a new file. Idempotence matters: formatting the output again must be a no-op, so assert that too when a change touches printing.
 
-**Pre-ship.** `pnpm run build` (tsc + rolldown), `pnpm run @ci:lint` (eslint + prettier check), `pnpm test`. Add a changeset with `pnpm run change`.
+**Pre-ship.** `pnpm run build` (tsc + rolldown), `pnpm run @ci:lint` (oxlint + prettier check), `pnpm test`. Add a changeset with `pnpm run change`.
 
 **Gotchas.** Behavior is coupled to the installed `htmljs-parser` version; a parse-level defect is usually filed there, not here. Prettier's own AST invariants (comments must attach, every node must print) surface as runtime throws rather than wrong output.

@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "node": true,
+    "vitest": true
+  },
+  "ignorePatterns": [".vscode", "coverage", "dist", "**/__snapshots__"],
+  "jsPlugins": ["eslint-plugin-simple-import-sort"],
+  "rules": {
+    "no-unused-expressions": "off",
+    "no-unused-vars": "off",
+    "simple-import-sort/exports": "error",
+    "simple-import-sort/imports": "error",
+    "typescript/no-duplicate-enum-values": "off",
+    "typescript/no-import-type-side-effects": "error"
+  }
+}

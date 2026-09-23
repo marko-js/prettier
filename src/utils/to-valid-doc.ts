@@ -27,6 +27,18 @@ export function toValidAttrValue(doc: Doc, concise: boolean) {
   }
 }
 
+// A value printed from source keeps its text, so unless htmljs-parser reports
+// it safe to inline, eg it ends in a line comment, it is enclosed in parens,
+// and if that is still not safe, across lines. Those newlines are text, like
+// the rest of the source, so the next pass lays the value out the same way.
+export function toValidExactAttrValue(code: string, concise: boolean): Doc {
+  if (isValidAttrValue(code, concise) === Validity.enclosed) return code;
+  const enclosed = `(${code})`;
+  return isValidAttrValue(enclosed, concise) === Validity.enclosed
+    ? enclosed
+    : `(\n${code}\n)`;
+}
+
 export function toValidScriptlet(doc: Doc) {
   return toValidBlock(doc, isValidScriptlet);
 }
