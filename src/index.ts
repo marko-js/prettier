@@ -894,7 +894,7 @@ function printBody(
       const wasInlineTag = isInlineTag;
       let childDoc = child.call(print);
       if (child.node.type === NodeType.Text && typeof childDoc === "string") {
-        childDoc = trimText(childDoc, child as AstPath<Node.Text>);
+        childDoc = trimText(childDoc, child as AstPath<Node.Text>, opts);
       }
 
       if (!childDoc) return;
@@ -1082,46 +1082,32 @@ function wrapConciseText(doc: Doc) {
   ]);
 }
 
-function trimText(text: string, path: AstPath<Node.Text>) {
-  if (/^(?:\n\s*)?(?:\n\s*)?$/.test(text)) return "";
-
+function trimText(text: string, path: AstPath<Node.Text>, opts: Options) {
   const siblings = path.siblings as Node.ChildNode[];
-  let trimmed = text;
-  let prev: Node.ChildNode | undefined;
-  let next: Node.ChildNode | undefined;
+  const index = path.index!;
+  if (rendersNothing(siblings, index, opts)) return "";
 
-  for (let i = path.index!; --i >= 0;) {
-    const sibling = siblings[i];
-    if (
-      sibling.type !== NodeType.Scriptlet &&
-      sibling.type !== NodeType.Comment
-    ) {
-      prev = sibling;
-      break;
-    }
-  }
-
-  for (let i = path.index!; ++i < siblings.length;) {
-    const sibling = siblings[i];
-    if (
-      sibling.type !== NodeType.Scriptlet &&
-      sibling.type !== NodeType.Comment
-    ) {
-      next = sibling;
-      break;
-    }
-  }
-
+  const prev = findRenderedSibling(siblings, index, -1, opts);
+  const next = findRenderedSibling(siblings, index, 1, opts);
   const parent = path.node.parent;
-  const isInline = !parent.parent || parent.concise ? isTextLike : isInlineHTML;
-  const trimStart = !(prev && isInline(prev));
-  const trimEnd = !(next && isInline(next));
+  const isInline = (node: Node.ChildNode) => {
+    // Concise output puts a tag on its own line, which is not whitespace, so
+    // whitespace the compiler renders beside a tag has to be kept.
+    if (isConcise(opts) && node.type === NodeType.Tag) return true;
+    // A concise parent can still hold HTML tags, from a `---` block, and the
+    // whitespace beside an inline one renders.
+    return (!parent.parent || parent.concise) &&
+      !(node.type === NodeType.Tag && !node.concise)
+      ? isTextLike(node)
+      : isInlineHTML(node);
+  };
+  let trimmed = text;
 
-  if (trimStart) {
+  if (!(prev && isInline(prev))) {
     trimmed = trimmed.replace(/^\n\s*/, "");
   }
 
-  if (trimEnd) {
+  if (!(next && isInline(next))) {
     trimmed = trimmed.replace(/\n\s*$/, "");
   }
 
@@ -1148,6 +1134,42 @@ function readNextContent(path: AstPath<Node.Text>, opts: Options) {
 function isVisibleSpacePlaceholder(node: Node.Placeholder, opts: Options) {
   const code = read(node.value, opts);
   return code === '" "' || code === "' '";
+}
+
+function findRenderedSibling(
+  siblings: Node.ChildNode[],
+  index: number,
+  step: 1 | -1,
+  opts: Options,
+) {
+  for (let i = index + step; i >= 0 && i < siblings.length; i += step) {
+    const sibling = siblings[i];
+    if (
+      sibling.type !== NodeType.Scriptlet &&
+      sibling.type !== NodeType.Comment &&
+      !rendersNothing(siblings, i, opts)
+    ) {
+      return sibling;
+    }
+  }
+}
+
+// Mirrors @marko/compiler, which drops a text that is only line breaks, or only
+// whitespace after a text that already ends in whitespace.
+function rendersNothing(
+  siblings: Node.ChildNode[],
+  index: number,
+  opts: Options,
+): boolean {
+  const node = siblings[index];
+  if (node.type !== NodeType.Text) return false;
+
+  const text = read(node, opts);
+  if (/^(?:\n\s*)?(?:\n\s*)?$/.test(text)) return true;
+  if (/\S/.test(text)) return false;
+
+  const prev = findRenderedSibling(siblings, index, -1, opts);
+  return prev?.type === NodeType.Text && /\s$/.test(read(prev, opts));
 }
 
 function isTextLike(node: AnyNode): node is Node.Text | Node.Placeholder {
