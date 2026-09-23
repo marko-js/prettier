@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       htmljs-parser:
-        specifier: ^5.15.1
-        version: 5.15.1
+        specifier: ^5.16.0
+        version: 5.16.0
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^1.0.1
@@ -1008,8 +1008,8 @@ packages:
   hookified@2.2.0:
     resolution: {integrity: sha512-p/LgFzRN5FeoD3DLS6bkUapeye6E4SI6yJs6KetENd18S+FBthqYq2amJUWpt5z0EQwwHemidjY5OqJGEKm5uA==}
 
-  htmljs-parser@5.15.1:
-    resolution: {integrity: sha512-xGLrimEFW0xQabwGz0AfAB9AEC9I7iU+3SLF8aLr004UDhWt/LDAL7NhbbcvABxXCZdqS7cnfDJmDfd7DP/Mfg==}
+  htmljs-parser@5.16.0:
+    resolution: {integrity: sha512-Akbo+lEYfUNZJYc7p8FDvfBL22j1nry/ErDYR1K6g5Q3oGiUuZTYbzR0LJbAwygjDQnn82KYd1NYDJU1AreVMw==}
 
   human-id@4.2.1:
     resolution: {integrity: sha512-zPGsiS+dWoTZtZ4AtpA9Y+BdSFSNWvnouNlWNoUFyAM6xHOHmdCvqO3k8AIbdamCOv4gUFUVNPf6rJFfc4UiJw==}
@@ -1778,7 +1778,7 @@ snapshots:
     dependencies:
       '@luxass/strip-json-comments': 2.0.2
       complain: 1.6.1
-      htmljs-parser: 5.15.1
+      htmljs-parser: 5.16.0
       jsesc: 3.1.0
       kleur: 4.1.5
       lasso-package-root: 1.0.1
@@ -2306,7 +2306,7 @@ snapshots:
 
   hookified@2.2.0: {}
 
-  htmljs-parser@5.15.1: {}
+  htmljs-parser@5.16.0: {}
 
   human-id@4.2.1: {}
 

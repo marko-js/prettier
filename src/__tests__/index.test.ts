@@ -31,10 +31,6 @@ const marko5Fixtures = new Set([
   "something-wrong",
 ]);
 
-// Known failures without a JS parser, each filed in agent-feedback/items:
-// text-content-backslashes: 2026-08-21-text-backslash-doubling.md
-const fallbackFailures = new Set(["text-content-backslashes"]);
-
 for (const entry of fs.readdirSync(fixtures)) {
   if (/\.skip\./g.test(entry)) continue;
   const fixtureName = entry.replace(/\..*$/, "");
@@ -88,26 +84,23 @@ for (const entry of fs.readdirSync(fixtures)) {
 
       // `prettier/standalone` with only this plugin cannot embed JS, so this
       // covers the printer's fallback of printing code from source.
-      (fallbackFailures.has(fixtureName) ? it.fails : it)(
-        `${name} without a JS parser`,
-        async () => {
-          const fullOpts = {
-            filepath,
-            parser: "marko",
-            plugins: [plugin],
-            ...opts,
-          };
-          const formatted = await formatStandalone(source, fullOpts);
-          expect(await formatStandalone(formatted, fullOpts)).toBe(formatted);
-          const { text, code } = getCompiledShape(
-            filepath,
-            formatted,
-            translator,
-          );
-          expect(text).toBe(shape.text);
-          if (shape.code !== undefined) expect(code).toBe(shape.code);
-        },
-      );
+      it(`${name} without a JS parser`, async () => {
+        const fullOpts = {
+          filepath,
+          parser: "marko",
+          plugins: [plugin],
+          ...opts,
+        };
+        const formatted = await formatStandalone(source, fullOpts);
+        expect(await formatStandalone(formatted, fullOpts)).toBe(formatted);
+        const { text, code } = getCompiledShape(
+          filepath,
+          formatted,
+          translator,
+        );
+        expect(text).toBe(shape.text);
+        if (shape.code !== undefined) expect(code).toBe(shape.code);
+      });
     }
   });
 }
