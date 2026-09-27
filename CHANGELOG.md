@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.1.4
+
+### Patch Changes
+
+- [#156](https://github.com/marko-js/prettier/pull/156) [`e72ec04`](https://github.com/marko-js/prettier/commit/e72ec04cce6ca1c674d6f174e717e0afa8ba9909) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Keep the whitespace that renders beside a tag: before an inline tag inside a concise `---` block, and beside any tag when printing concise output, where a tag's own line is not whitespace. Indentation-only lines inside a `---` block no longer leave a stray space before a closing tag.
+
 ## 4.1.3
 
 ### Patch Changes
