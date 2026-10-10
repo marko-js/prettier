@@ -138,7 +138,7 @@ export const options: SupportOptions = {
     choices: [
       {
         value: "auto",
-        description: "Determine output syntax by the input syntax used.",
+        description: "Keep the syntax each tag was written in.",
       },
       {
         value: "html",
@@ -157,17 +157,6 @@ export const parsers: Record<string, Parser<AnyNode>> = {
     astFormat: "marko-ast",
     parse(text, opts) {
       const { program } = (opts._markoParsed = parseMarko(text, opts.filepath));
-
-      if (opts.markoSyntax === "auto") {
-        opts.markoSyntax = "html";
-
-        for (const child of program.body) {
-          if (child.type === NodeType.Tag) {
-            if (child.concise) opts.markoSyntax = "concise";
-            break;
-          }
-        }
-      }
 
       return program;
     },
@@ -215,7 +204,7 @@ const printHandlers: PrintHandlers = {
     if (value?.type === NodeType.AttrValue) {
       return [
         read({ start: node.start, end: value.value.start }, opts),
-        toValidExactAttrValue(read(value.value, opts), isConcise(opts)),
+        toValidExactAttrValue(read(value.value, opts), isConcise(node, opts)),
       ];
     }
 
@@ -236,7 +225,10 @@ const printHandlers: PrintHandlers = {
   },
   [NodeType.AttrSpread]: (path, opts) => [
     "...",
-    toValidExactAttrValue(read(path.node.value, opts), isConcise(opts)),
+    toValidExactAttrValue(
+      read(path.node.value, opts),
+      isConcise(path.node, opts),
+    ),
   ],
   [NodeType.Class]: printExact,
   [NodeType.Export]: printExact,
@@ -407,7 +399,7 @@ const embedHandlers: EmbedHandlers = {
           node.value.bound ? ":=" : "=",
           toValidAttrValue(
             await toDoc(read(node.value.value, opts), exprParse),
-            isConcise(opts),
+            isConcise(node, opts),
           ),
         );
       }
@@ -420,7 +412,7 @@ const embedHandlers: EmbedHandlers = {
       "...",
       toValidAttrValue(
         await toDoc(read(path.node.value, opts), exprParse),
-        isConcise(opts),
+        isConcise(path.node, opts),
       ),
     ]);
   },
@@ -567,7 +559,7 @@ function printTag(
   print: PrintFn,
   body: Body = printBody(path, opts, print),
 ) {
-  return (isConcise(opts) ? printConciseTag : printHTMLTag)(
+  return (isConcise(path.node, opts) ? printConciseTag : printHTMLTag)(
     path,
     opts,
     print,
@@ -647,7 +639,7 @@ function printOpenTag(
   print: PrintFn,
 ) {
   const { node } = path;
-  const concise = isConcise(opts);
+  const concise = isConcise(node, opts);
   const comments = node.comments ?? [];
   const hasDefault = !!node.attrs && isDefaultAttr(node.attrs[0]);
   const headLine: OpenTagLine = {
@@ -823,8 +815,16 @@ function printBody(
   const { node } = path;
   if (!node.body) return;
 
-  const concise = !node.parent || isConcise(opts);
-  const isInline = concise ? isTextLike : isInlineHTML;
+  const concise = !node.parent || isConcise(node, opts);
+  const inlineTags =
+    concise && node.parent
+      ? getInlineTagsBesideText(node.body as Node.ChildNode[], opts)
+      : undefined;
+  const isInline = (child: AstPath<AnyNode>) =>
+    concise
+      ? isTextLike(child.node) ||
+        !!inlineTags?.has(child.node as Node.ChildNode)
+      : isInlineHTML(child.node);
   const preserve = hasPreservedText(node);
   let content: Doc[] | undefined;
   let inline: doc.builders.Fill["parts"] | undefined;
@@ -835,7 +835,7 @@ function printBody(
     path.each((child) => {
       const childDoc = child.call(print);
       inlineChild =
-        isInline(child.node) ||
+        isInline(child) ||
         (inlineChild &&
           child.node.type === NodeType.Comment &&
           child.node.commentType !== CommentType.line);
@@ -848,7 +848,7 @@ function printBody(
         }
 
         if (child.node.type === NodeType.Text && typeof childDoc === "string") {
-          const nl = isConcise(opts) ? b.hardline : b.literalline;
+          const nl = concise ? b.hardline : b.literalline;
           let lineStart = 0;
           for (let i = 0; i < childDoc.length; i++) {
             if (childDoc.charAt(i) === "\n") {
@@ -902,7 +902,7 @@ function printBody(
       content ||= [];
       isInlineTag = false;
       inlineChild =
-        isInline(child.node) ||
+        isInline(child) ||
         (inlineChild &&
           child.node.type === NodeType.Comment &&
           child.node.commentType !== CommentType.line);
@@ -1093,7 +1093,7 @@ function trimText(text: string, path: AstPath<Node.Text>, opts: Options) {
   const isInline = (node: Node.ChildNode) => {
     // Concise output puts a tag on its own line, which is not whitespace, so
     // whitespace the compiler renders beside a tag has to be kept.
-    if (isConcise(opts) && node.type === NodeType.Tag) return true;
+    if (isConcise(parent, opts) && node.type === NodeType.Tag) return true;
     // A concise parent can still hold HTML tags, from a `---` block, and the
     // whitespace beside an inline one renders.
     return (!parent.parent || parent.concise) &&
@@ -1180,6 +1180,42 @@ function isTextLike(node: AnyNode): node is Node.Text | Node.Placeholder {
     default:
       return false;
   }
+}
+
+function isInlineHTMLTag(node: AnyNode, opts: Options) {
+  return (
+    node.type === NodeType.Tag && !isConcise(node, opts) && isInlineHTML(node)
+  );
+}
+
+// HTML tags are only kept inline in concise text when they sit in a run of
+// text and inline tags that has some text in it.
+function getInlineTagsBesideText(
+  siblings: Node.ChildNode[],
+  opts: Options,
+): Set<Node.ChildNode> {
+  const inlineTags = new Set<Node.ChildNode>();
+  let run: Node.ChildNode[] = [];
+  let hasText = false;
+
+  const endRun = () => {
+    if (hasText) for (const tag of run) inlineTags.add(tag);
+    run = [];
+    hasText = false;
+  };
+
+  siblings.forEach((sibling, i) => {
+    if (isTextLike(sibling) && !rendersNothing(siblings, i, opts)) {
+      hasText = true;
+    } else if (isInlineHTMLTag(sibling, opts)) {
+      run.push(sibling);
+    } else {
+      endRun();
+    }
+  });
+  endRun();
+
+  return inlineTags;
 }
 
 function isInlineHTML(
@@ -1271,8 +1307,18 @@ function printCommentLines(code: string): Doc {
   return parts;
 }
 
-function isConcise(opts: Options) {
-  return opts.markoSyntax === "concise";
+function isConcise(node: AnyNode, opts: Options): boolean {
+  if (opts.markoSyntax !== "auto") return opts.markoSyntax === "concise";
+
+  switch (node.type) {
+    case NodeType.Tag:
+    case NodeType.AttrTag:
+      return node.concise;
+    case NodeType.Program:
+      return true;
+    default:
+      return isConcise(node.parent, opts);
+  }
 }
 
 const explicitLineReg = /\S?\n\n/y;
