@@ -1,10 +1,10 @@
 button async onClick() {
   await save();
-} -- x
+} `x
 
 button async onClick<T extends Event>(event: T) {
   await save(event);
-} -- x
+} `x
 
 custom-tag async (value) {
   await save(value);
@@ -20,11 +20,11 @@ custom-tag async <T>(value: T) {
 
 button async on-click() {
   await save();
-} -- x
+} `x
 
 button async onClick() {
   await save();
-} -- x
+} `x
 
 custom-tag
   @item async on-select(value) {

@@ -23,13 +23,64 @@ export function ensureVisibleSpace(parts: Doc[], opts: Options) {
   }
 }
 
-export function ensureVisibleTrailingSpace(parts: Doc[], opts: Options) {
-  const last = parts.length - 1;
-  if (typeof parts[last] === "string" && /[ \t]$/.test(parts[last])) {
-    parts[last] =
-      escapeTrailingBackslashes(parts[last].slice(0, -1), opts) +
-      getVisibleSpace(opts);
+export interface ConciseSpace {
+  leading?: Doc;
+  trailing?: Doc;
+}
+
+/**
+ * Concise text can hold its leading and trailing whitespace literally on one
+ * line, which then needs closing backticks. Where the text breaks, a placeholder
+ * stands in for it instead: the printer trims whitespace before a break, and a
+ * block's indentation is read from its first line.
+ *
+ * The whitespace is taken out of the parts and returned, to be printed around
+ * them.
+ */
+export function takeLiteralSpace(parts: Doc[], opts: Options): ConciseSpace {
+  const trailing = takeTrailingSpace(parts, opts);
+  let leading: Doc | undefined;
+  if (parts[0] === b.line) {
+    parts.shift();
+    leading = literalOrVisibleSpace(opts);
   }
+
+  return { leading, trailing };
+}
+
+function literalOrVisibleSpace(opts: Options) {
+  return b.ifBreak(getVisibleSpace(opts), " ");
+}
+
+function takeTrailingSpace(parts: Doc[], opts: Options) {
+  const last = parts.length - 1;
+  const lastPart = parts[last];
+  let spaces = "";
+
+  if (lastPart === b.line) {
+    parts.pop();
+    spaces = " ";
+  } else if (typeof lastPart === "string") {
+    const trimmed = lastPart.replace(/[ \t]+$/, "");
+    spaces = lastPart.slice(trimmed.length);
+    parts[last] = trimmed;
+  }
+
+  if (!spaces) return;
+
+  let backslashes = "";
+  const before = parts[parts.length - 1];
+  if (spaces.length === 1 && typeof before === "string") {
+    const trimmed = before.replace(/\\+$/, "");
+    backslashes = before.slice(trimmed.length);
+    parts[parts.length - 1] = trimmed;
+  }
+
+  const visibleSpace = getVisibleSpace(opts);
+  return b.ifBreak(
+    escapeText(backslashes, visibleSpace) + spaces.slice(0, -1) + visibleSpace,
+    backslashes + spaces,
+  );
 }
 
 export function ensureVisibleSpaceBetweenTags(parts: Doc[], opts: Options) {

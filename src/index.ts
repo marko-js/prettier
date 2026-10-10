@@ -21,6 +21,7 @@ import {
   type Range,
   TagType,
 } from "./parser";
+import { printBacktickBody, wrapConciseText } from "./utils/concise-text";
 import { getFormattedBody } from "./utils/get-formatted-body";
 import {
   getParserFromExt,
@@ -37,11 +38,12 @@ import {
   toValidStatement,
 } from "./utils/to-valid-doc";
 import {
+  type ConciseSpace,
   ensureVisibleSpace,
   ensureVisibleSpaceBetweenTags,
-  ensureVisibleTrailingSpace,
   getVisibleSpace,
   isVisibleSpace,
+  takeLiteralSpace,
 } from "./utils/visible-space";
 
 declare module "prettier" {
@@ -81,10 +83,12 @@ type PrintHandlers = {
   [K in NodeType]?: PrintHandler<AnyNode & { type: K }>;
 };
 
-type Body = ReturnType<typeof printBody>;
+type Body =
+  | { inline: true; preserve: boolean; space?: ConciseSpace; content: Doc }
+  | { inline: false; preserve: boolean; content: Doc[] }
+  | undefined;
 
 const b = doc.builders;
-const traverseDoc = doc.utils.traverseDoc;
 const findInDoc = doc.utils.findInDoc;
 const mapDoc = doc.utils.mapDoc;
 const hasNewline = util.hasNewline;
@@ -269,7 +273,7 @@ const printHandlers: PrintHandlers = {
 
     return [
       body.inline
-        ? wrapConciseText(body.content)
+        ? wrapConciseText(body.content, { space: body.space })
         : b.join(b.hardline, body.content),
       b.hardline,
     ];
@@ -617,9 +621,11 @@ function printConciseTag(
           ? body.preserve || openTag.endsWithLineComment
             ? b.indent([
                 openTag.endsWithLineComment ? b.hardline : b.line,
-                wrapConciseText(body.content),
+                wrapConciseText(body.content, {
+                  space: body.space,
+                }),
               ])
-            : [" --", b.indent([b.line, body.content])]
+            : printBacktickBody(body.content, body.space)
           : b.indent([b.hardline, b.join(b.hardline, body.content)]),
       ),
     );
@@ -811,7 +817,7 @@ function printBody(
   path: AstPath<Node.ParentNode>,
   opts: Options,
   print: PrintFn,
-) {
+): Body {
   const { node } = path;
   if (!node.body) return;
 
@@ -829,6 +835,21 @@ function printBody(
   let content: Doc[] | undefined;
   let inline: doc.builders.Fill["parts"] | undefined;
   let inlineIndex = -1;
+
+  const closeInlineRun = (parts: Doc[]) => {
+    if (concise) return takeLiteralSpace(parts, opts);
+    ensureVisibleSpace(parts, opts);
+  };
+
+  const endInlineRun = (parts: Doc[], trailingComment?: string) => {
+    const space = closeInlineRun(parts);
+    if (concise) {
+      content![inlineIndex] = wrapConciseText(content![inlineIndex], {
+        space,
+        trailingComment,
+      });
+    }
+  };
 
   if (preserve) {
     let inlineChild = false;
@@ -871,21 +892,13 @@ function printBody(
         }
       } else {
         if (inline) {
-          if (concise) {
-            ensureVisibleTrailingSpace(inline, opts);
-            content[inlineIndex] = wrapConciseText(content[inlineIndex]);
-          }
-
+          endInlineRun(inline);
           inline = undefined;
         }
 
         content.push(childDoc);
       }
     }, "body");
-
-    if (inline && concise) {
-      ensureVisibleTrailingSpace(inline, opts);
-    }
   } else {
     let inlineChild = false;
     let isInlineTag = false;
@@ -901,11 +914,14 @@ function printBody(
 
       content ||= [];
       isInlineTag = false;
+      const trailingComment =
+        concise && inline ? getTrailingComment(child, opts) : undefined;
       inlineChild =
-        isInline(child) ||
-        (inlineChild &&
-          child.node.type === NodeType.Comment &&
-          child.node.commentType !== CommentType.line);
+        trailingComment === undefined &&
+        (isInline(child) ||
+          (inlineChild &&
+            child.node.type === NodeType.Comment &&
+            child.node.commentType !== CommentType.line));
 
       if (isExplicitLine) {
         const last = content.length - 1;
@@ -950,6 +966,12 @@ function printBody(
             }
             break;
 
+          case NodeType.Comment:
+            if (!endsWithLine(inline)) {
+              childDoc = toHTMLComment(child.node, opts) ?? childDoc;
+            }
+            break;
+
           case NodeType.Tag:
             isInlineTag = true;
             ensureVisibleSpaceBetweenTags(inline, opts);
@@ -966,14 +988,11 @@ function printBody(
         isExplicitLine = !child.isLast && hasExplicitLine(child, opts);
 
         if (inline) {
-          ensureVisibleSpace(inline, opts);
+          endInlineRun(inline, trailingComment);
           inline = undefined;
-
-          if (concise) {
-            content[inlineIndex] = wrapConciseText(content[inlineIndex]);
-          }
         }
 
+        if (trailingComment !== undefined) return;
         content.push(childDoc);
       }
     }, "body");
@@ -981,26 +1000,19 @@ function printBody(
 
   if (content) {
     if (inline) {
-      ensureVisibleSpace(inline, opts);
-
       if (inlineIndex === 0) {
         return {
           inline: true,
           preserve,
+          space: closeInlineRun(inline),
           content: content[inlineIndex],
-        } as const;
+        };
       }
 
-      if (concise) {
-        content[inlineIndex] = wrapConciseText(content[inlineIndex]);
-      }
+      endInlineRun(inline);
     }
 
-    return {
-      inline: false,
-      preserve,
-      content,
-    } as const;
+    return { inline: false, preserve, content };
   }
 }
 
@@ -1057,29 +1069,28 @@ async function argsToDoc(
   return unexpectedDoc(opts, node);
 }
 
-function wrapConciseText(doc: Doc) {
-  let maxDashes = 0;
-  traverseDoc(doc, (child) => {
-    if (typeof child === "string") {
-      let current = 0;
-      for (const char of child) {
-        if (char === "-") {
-          current++;
-          if (current > maxDashes) maxDashes = current;
-        } else {
-          current = 0;
-        }
-      }
-    }
-  });
+function getTrailingComment(child: AstPath<AnyNode>, opts: Options) {
+  const comment = child.node;
+  const text = child.previous as AnyNode | null;
+  if (
+    comment.type !== NodeType.Comment ||
+    comment.commentType === CommentType.html ||
+    !text ||
+    !isTextLike(text)
+  ) {
+    return;
+  }
 
-  const breakDashes = maxDashes > 1 ? "-".repeat(maxDashes + 1) : "--";
-  return b.group([
-    b.ifBreak(breakDashes, "--"),
-    b.line,
-    doc,
-    b.ifBreak([b.line, breakDashes]),
-  ]);
+  const gap = read({ start: text.end, end: comment.start }, opts);
+  const onOwnLine = gap.includes("\n");
+  const afterClosingBackticks = gap.includes("`");
+  const touchesText = !/\s$/.test(read(text, opts));
+  const isTrailing =
+    comment.commentType === CommentType.line
+      ? !onOwnLine
+      : touchesText || afterClosingBackticks;
+
+  if (isTrailing) return read(comment, opts).trim();
 }
 
 function trimText(text: string, path: AstPath<Node.Text>, opts: Options) {
@@ -1280,6 +1291,15 @@ function printOpenTagComment(
   return endsLine
     ? [read(comment, opts), b.breakParent]
     : toBlockComment(read(comment.value, opts));
+}
+
+// A /* */ comment is only a comment after whitespace, so one that follows
+// something other than whitespace is printed in the form that needs no boundary.
+function toHTMLComment(node: Node.Comment, opts: Options) {
+  if (node.commentType !== CommentType.block) return;
+
+  const text = read(node, opts).slice(2, -2);
+  if (!text.includes("-->")) return printCommentLines(`<!--${text}-->`);
 }
 
 /** Prints a comment with its lines indented as they were relative to each other. */

@@ -1,38 +1,38 @@
 p
-  -- I want to use${" "}
-  em -- emphasis
-  -- ,${" "}
-  strong -- strong text
-  -- ${" "}, and${" "}
-  sup -- super
-  sup -- duper
-  -- ${" "}
-  sub -- subscripts
-  -- ${" "}without a bunch of newlines.
+  `I want to use `
+  em `emphasis
+  `, `
+  strong `strong text
+  ` , and `
+  sup `super
+  sup `duper
+  ` `
+  sub `subscripts
+  ` without a bunch of newlines.
 
 p
-  -- whentagcontentuses
+  `whentagcontentuses
   strong
-    a href="smooshcase.com" -- smoosh
-    -- case
-  -- itshouldbepreserved
+    a href="smooshcase.com" `smoosh
+    `case
+  `itshouldbepreserved
 
 div class="a11y-pattern-content"
-  p -- Provide an accessible label to an element or widget.
+  p `Provide an accessible label to an element or widget.
   p
-    -- These two attributes${" "}
-    strong -- must
+    `These two attributes `
+    strong `must
 
-    strong -- not
-    --
-    ${" "}be used on elements or widgets that already have a non-ARIA labelling mechanism
-    in place. Examples of non-ARIA labelling mechanisms are the${" "}
-    --
-    code -- &lt;label&gt;
-    -- ${" "}tag for form inputs, and inner text for buttons.
+    strong `not
+    `
+     be used on elements or widgets that already have a non-ARIA labelling
+    mechanism in place. Examples of non-ARIA labelling mechanisms are the${" "}
+    `
+    code `&lt;label&gt;
+    ` tag for form inputs, and inner text for buttons.
   pre
     code class="language-html"
-      --
+      `
       &lt;a href=&quot;javascript:;&quot; id=&quot;share&quot;&gt;Share on Facebook&lt;/a&gt;
 
       &lt;script&gt;
@@ -41,11 +41,11 @@ div class="a11y-pattern-content"
         });
       &lt;/script&gt;
 
-      --
+      `
   p
-    -- The table tags should only be used to represent${" "}
-    a href="components/table" -- tabular relationships between data
-    --
+    `The table tags should only be used to represent `
+    a href="components/table" `tabular relationships between data
+    `
     . The table tags have semantics that will cause problems for screen reader
     users if used for layout.
-    --
+    `
