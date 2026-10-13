@@ -1,0 +1,5 @@
+div class="output"
+  ,id="compiled"
+  ,onbeforeinput="return false" `${" "}$!{ highlighter.codeToHtml(compiledCode || (outputLang === "html" ? "" : "/* empty */"), { ...compiledHighlightOpts, lang: outputLang }) }`
+section
+  `${" "}$!{ highlighter.codeToHtml(compiledCode || (outputLang === "html" ? "" : "/* empty */"), { ...compiledHighlightOpts, lang: outputLang }) }`

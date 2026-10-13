@@ -70,7 +70,7 @@ On top of [Prettier's options](https://prettier.io/docs/en/options.html), there 
 ## `markoSyntax: "auto" | "html" | "concise"`
 
 Marko supports both an [html like](https://markojs.com/docs/syntax/) and [concise](https://markojs.com/docs/concise/) syntaxes.
-By default this plugin will try to detect the syntax you are already using and output a formatted document in that syntax.
+By default this plugin keeps the syntax each tag was written in, so a template can mix them, such as an HTML `<em>` tag inside concise text.
 
 You can overide the default (`"auto"`) to enforce that all templates are formatted to the syntax of your choosing.
 

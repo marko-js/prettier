@@ -10,12 +10,12 @@ input
   ,type="text"
 
 section // Rendered on the server
-  -- Content
+  `Content
 
 if /* feature flag */=showBanner
   aside
 
-for|item| /* in display order */ of=items -- ${item}
+for|item| /* in display order */ of=items `${item}
 
 canvas /* measured on mount */ /canvas
 
@@ -24,7 +24,7 @@ details
   the route changes */
 
 textarea // Kept empty for the placeholder
-  -- Notes
+  `Notes
 
 nav
   ,hidden /* Shown by the menu button */ // Styled by the header
