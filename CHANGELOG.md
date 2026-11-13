@@ -1,5 +1,13 @@
 # prettier-plugin-marko
 
+## 4.1.4
+
+### Patch Changes
+
+- [#156](https://github.com/marko-js/prettier/pull/156) [`e72ec04`](https://github.com/marko-js/prettier/commit/e72ec04cce6ca1c674d6f174e717e0afa8ba9909) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Keep the whitespace that renders beside a tag: before an inline tag inside a concise `---` block, and beside any tag when printing concise output, where a tag's own line is not whitespace. Indentation-only lines inside a `---` block no longer leave a stray space before a closing tag.
+
+- [#161](https://github.com/marko-js/prettier/pull/161) [`878f578`](https://github.com/marko-js/prettier/commit/878f5783633c1d250b3c3391e82397721bc51e9f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Require htmljs-parser 5.22, matching the Marko compiler, which fixes several misparses (regular expressions after keywords like `return`, escaped quotes and regular expressions in `<script>` bodies, `<!-- a->b -->` comments, spaced non-null `!` assertions, attribute values starting with a comment, and unfinished concise constructs at EOF).
+
 ## 4.1.3
 
 ### Patch Changes
