@@ -1,5 +1,11 @@
 # prettier-plugin-marko
 
+## 4.1.5
+
+### Patch Changes
+
+- [#162](https://github.com/marko-js/prettier/pull/162) [`9eadee6`](https://github.com/marko-js/prettier/commit/9eadee6980236ce93a2fc5ba24869770d745ad39) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Format identifiers and plain strings in a template without parsing them, which makes formatting about 1.4x faster.
+
 ## 4.1.4
 
 ### Patch Changes
