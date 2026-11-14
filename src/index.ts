@@ -90,6 +90,33 @@ const mapDoc = doc.utils.mapDoc;
 const hasNewline = util.hasNewline;
 const stmtParse = { parser: "babel-ts" } satisfies Options;
 const exprParse = { parser: "__ts_expression" } satisfies Options;
+const identifierReg = /^[A-Za-z_$][\w$]*$/;
+const plainStringReg = /^(["'])((?:(?!\1)[^\\\n\r\u2028\u2029])*)\1$/;
+
+/**
+ * `textToDoc` but for the expressions whose doc is only their text (an
+ * identifier, and a string without escapes or line breaks, quoted as Prettier
+ * quotes it): those skip parsing and the embed's own option normalization,
+ * which is most of an embed's cost. A chain of `.name`s is not one: its doc
+ * can break.
+ */
+function withPlainExpressions(toDoc: ToDocFn, opts: Options): ToDocFn {
+  return async (text, options) => {
+    if (options === exprParse) {
+      const code = text.trim();
+      if (identifierReg.test(code)) return code;
+      const string = plainStringReg.exec(code);
+      if (string) {
+        const content = string[2];
+        return util.makeString(
+          content,
+          util.getPreferredQuote(content, !!opts.singleQuote),
+        );
+      }
+    }
+    return toDoc(text, options);
+  };
+}
 const noVisitorKeys = [] as const;
 const tagVisitorKeys = [
   "name",
@@ -194,7 +221,12 @@ export const printers: Record<string, Printer<AnyNode>> = {
       );
     },
     embed(path) {
-      return embedHandlers[path.node.type as NodeType] ?? null;
+      const handler = embedHandlers[path.node.type as NodeType] as
+        EmbedHandler<AnyNode> | undefined;
+      return handler
+        ? (toDoc, print, path, opts) =>
+            handler(withPlainExpressions(toDoc, opts), print, path, opts)
+        : null;
     },
     getVisitorKeys(node) {
       return (
